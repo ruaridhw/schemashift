@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,8 @@ from .models import FormatConfig
 from .target_schema import TargetSchema
 from .transform import dry_run, validate_config
 
+_log = logging.getLogger(__name__)
+
 _DSL_REFERENCE = """\
 DSL Expression Reference:
   col("Column Name")                        # reference a column
@@ -25,7 +27,9 @@ DSL Expression Reference:
   col("Name").str.lower()                   # lowercase
   col("Name").str.to_uppercase()            # uppercase
   col("Name").str.slice(0, 3)              # first 3 chars
-  col("Name").str.replace("old", "new")    # replace substring
+  col("Name").str.replace("old", "new")                  # replace substring (literal)
+  col("Name").str.replace_regex("\\d+", "NUM")           # replace via regex
+  coalesce(col("A"), col("B"), "fallback")               # first non-null value
   col("Name").str.contains("x")            # boolean contains
   col("Name").str.starts_with("x")         # boolean
   col("Name").str.ends_with("x")           # boolean
@@ -130,7 +134,11 @@ def build_prompt(
 
     # Example configs
     if example_configs:
-        parts.append("\n## Example Configs")
+        parts.append(
+            f"\n## Example Configs\n"
+            f"The following are example configs that map to the same "
+            f"'{target_schema.name}' target schema:"
+        )
         for ex in example_configs:
             parts.append(ex.model_dump_json(indent=2))
 
@@ -163,8 +171,7 @@ def build_prompt(
 def generate_config(
     path: str,
     target_schema: TargetSchema,
-    llm: Any = None,
-    llm_fn: Callable[[str], str] | None = None,
+    llm: Any,
     example_configs: list[FormatConfig] | None = None,
     format_name: str | None = None,
     max_retries: int = 2,
@@ -176,7 +183,6 @@ def generate_config(
         path: Path to the source data file.
         target_schema: The desired output schema.
         llm: A LangChain BaseChatModel-compatible object (uses ``invoke``).
-        llm_fn: A plain callable that accepts a prompt string and returns a response string.
         example_configs: Optional existing FormatConfigs to include as examples.
         format_name: Name for the generated config. Defaults to the file stem.
         max_retries: Number of additional attempts after the first failure.
@@ -186,12 +192,8 @@ def generate_config(
         A validated :class:`~schemashift.models.FormatConfig`.
 
     Raises:
-        ValueError: When neither ``llm`` nor ``llm_fn`` is provided.
         LLMGenerationError: When a valid config cannot be generated within the allowed attempts.
     """
-    if llm is None and llm_fn is None:
-        raise ValueError("Provide llm or llm_fn to generate_config()")
-
     from schemashift.readers import read_file
 
     df = read_file(path).head(sample_rows).collect()
@@ -201,21 +203,26 @@ def generate_config(
     prompt = build_prompt(df, target_schema, file_columns, example_configs, inferred_name)
 
     last_error: str = ""
-    attempts = max_retries + 1
+    total_attempts = max_retries + 1
+    all_attempts: list[dict] = []
 
-    for _ in range(attempts):
+    for attempt_num in range(1, total_attempts + 1):
+        response: str | None = None
+        attempt_error: str | None = None
+
         # Call the LLM
-        if llm is not None:
-            response: str = llm.invoke(prompt).content
-        else:
-            assert llm_fn is not None
-            response = llm_fn(prompt)
+        response = llm.invoke(prompt).content
 
         # 1. Extract JSON text
         try:
             json_str = _extract_json(response)
         except LLMGenerationError as exc:
             last_error = str(exc)
+            attempt_error = last_error
+            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
+            _log.warning(
+                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
+            )
             prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
             continue
 
@@ -224,6 +231,11 @@ def generate_config(
             data: dict[str, Any] = json.loads(json_str)
         except json.JSONDecodeError as exc:
             last_error = str(exc)
+            attempt_error = last_error
+            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
+            _log.warning(
+                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
+            )
             prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
             continue
 
@@ -236,6 +248,11 @@ def generate_config(
             config = FormatConfig.model_validate(data)
         except (ValidationError, Exception) as exc:
             last_error = str(exc)
+            attempt_error = last_error
+            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
+            _log.warning(
+                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
+            )
             prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
             continue
 
@@ -243,6 +260,11 @@ def generate_config(
         errors = validate_config(config)
         if errors:
             last_error = "\n".join(errors)
+            attempt_error = last_error
+            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
+            _log.warning(
+                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
+            )
             prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
             continue
 
@@ -251,11 +273,18 @@ def generate_config(
             dry_run(config, path, n_rows=5)
         except Exception as exc:
             last_error = str(exc)
+            attempt_error = last_error
+            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
+            _log.warning(
+                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
+            )
             prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
             continue
 
+        all_attempts.append({"prompt": prompt, "response": response, "error": None})
         return config
 
     raise LLMGenerationError(
-        f"Failed to generate valid config after {attempts} attempts: {last_error}"
+        f"Failed to generate valid config after {total_attempts} attempts: {last_error}",
+        attempts=all_attempts,
     )

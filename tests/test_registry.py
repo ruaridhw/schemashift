@@ -148,3 +148,107 @@ class TestFileSystemRegistry:
         result = reg.get("upd")
         assert result is not None
         assert result.description == "v2"
+
+
+# ---------------------------------------------------------------------------
+# FileSystemRegistry.load_schema
+# ---------------------------------------------------------------------------
+
+_SCHEMA_YAML = """\
+name: my_schema
+description: Test schema
+columns:
+  - name: id
+    type: str
+    required: true
+  - name: amount
+    type: float64
+    required: false
+"""
+
+_OTHER_SCHEMA_YAML = """\
+name: other_schema
+description: Another schema
+columns:
+  - name: code
+    type: str
+    required: true
+"""
+
+
+class TestFileSystemRegistryLoadSchema:
+    def test_returns_none_when_no_schemas_dir(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        assert reg.load_schema() is None
+
+    def test_returns_none_when_schemas_dir_empty(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        (tmp_path / "schemas").mkdir()
+        assert reg.load_schema() is None
+
+    def test_loads_single_yaml_schema(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
+
+        reg = FileSystemRegistry(tmp_path)
+        schema = reg.load_schema()
+
+        assert schema is not None
+        assert schema.name == "my_schema"
+        assert len(schema.columns) == 2
+
+    def test_loads_single_yml_schema(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yml").write_text(_SCHEMA_YAML, encoding="utf-8")
+
+        reg = FileSystemRegistry(tmp_path)
+        schema = reg.load_schema()
+
+        assert schema is not None
+        assert schema.name == "my_schema"
+
+    def test_returns_none_when_multiple_schemas_and_no_name(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "schema_a.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
+        (schemas_dir / "schema_b.yaml").write_text(_OTHER_SCHEMA_YAML, encoding="utf-8")
+
+        reg = FileSystemRegistry(tmp_path)
+        assert reg.load_schema() is None
+
+    def test_loads_named_schema_yaml(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
+        (schemas_dir / "other_schema.yaml").write_text(_OTHER_SCHEMA_YAML, encoding="utf-8")
+
+        reg = FileSystemRegistry(tmp_path)
+        schema = reg.load_schema("my_schema")
+
+        assert schema is not None
+        assert schema.name == "my_schema"
+
+    def test_loads_named_schema_yml_extension(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yml").write_text(_SCHEMA_YAML, encoding="utf-8")
+
+        reg = FileSystemRegistry(tmp_path)
+        schema = reg.load_schema("my_schema")
+
+        assert schema is not None
+        assert schema.name == "my_schema"
+
+    def test_returns_none_when_named_schema_not_found(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
+
+        reg = FileSystemRegistry(tmp_path)
+        assert reg.load_schema("nonexistent") is None
+
+    def test_returns_none_when_named_schema_and_no_schemas_dir(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        assert reg.load_schema("any_name") is None

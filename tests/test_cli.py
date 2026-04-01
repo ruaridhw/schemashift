@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
-from schemashift.cli import cli
+from schemashift.cli import _resolve_schema, cli
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -177,3 +178,276 @@ class TestDryRunCommand:
             ["dry-run", SALES_CONFIG, "--sample", SAMPLE_CSV, "--rows", "2"],
         )
         assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# _resolve_schema helper
+# ---------------------------------------------------------------------------
+
+SAMPLE_SCHEMA_YAML = """\
+name: test_schema
+description: Test target schema
+columns:
+  - name: id
+    type: str
+    required: true
+  - name: value
+    type: float64
+    required: false
+"""
+
+
+class TestResolveSchema:
+    def test_explicit_path_loads_schema(self, tmp_path: Path) -> None:
+        schema_file = tmp_path / "my_schema.yaml"
+        schema_file.write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+
+        schema = _resolve_schema(str(schema_file), None)
+
+        assert schema.name == "test_schema"
+        assert len(schema.columns) == 2
+
+    def test_registry_schemas_dir_single_yaml(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+
+        schema = _resolve_schema(None, str(tmp_path))
+
+        assert schema.name == "test_schema"
+
+    def test_registry_schemas_dir_single_yml(self, tmp_path: Path) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "my_schema.yml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+
+        schema = _resolve_schema(None, str(tmp_path))
+
+        assert schema.name == "test_schema"
+
+    def test_registry_multiple_schemas_raises_usage_error(self, tmp_path: Path) -> None:
+        import click
+
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "schema_a.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+        (schemas_dir / "schema_b.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+
+        with pytest.raises(click.UsageError, match="Multiple schemas found"):
+            _resolve_schema(None, str(tmp_path))
+
+    def test_registry_no_schemas_dir_raises_usage_error(self, tmp_path: Path) -> None:
+        import click
+
+        # tmp_path has no schemas/ subdirectory
+        with pytest.raises(click.UsageError, match="Provide --target-schema"):
+            _resolve_schema(None, str(tmp_path))
+
+    def test_no_args_raises_usage_error(self) -> None:
+        import click
+
+        with pytest.raises(click.UsageError, match="Provide --target-schema"):
+            _resolve_schema(None, None)
+
+    def test_explicit_path_takes_precedence_over_registry(self, tmp_path: Path) -> None:
+        schema_file = tmp_path / "explicit.yaml"
+        schema_file.write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+
+        # Also create a schemas/ dir — explicit path should still win
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        other_yaml = """\
+name: other_schema
+description: Other
+columns:
+  - name: col
+    type: str
+"""
+        (schemas_dir / "other.yaml").write_text(other_yaml, encoding="utf-8")
+
+        schema = _resolve_schema(str(schema_file), str(tmp_path))
+
+        assert schema.name == "test_schema"
+
+
+# ---------------------------------------------------------------------------
+# generate command
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateCommand:
+    """Tests for the generate command using a mocked LLM."""
+
+    @pytest.fixture()
+    def schema_file(self, tmp_path: Path) -> Path:
+        p = tmp_path / "schema.yaml"
+        p.write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+        return p
+
+    @pytest.fixture()
+    def mock_config(self):
+        from schemashift.models import ColumnMapping, FormatConfig
+
+        return FormatConfig(
+            name="generated_format",
+            description="Auto-generated",
+            columns=[ColumnMapping(target="id", source="ID")],
+        )
+
+    def test_generate_no_schema_errors(self, runner: CliRunner) -> None:
+        result = runner.invoke(cli, ["generate", SAMPLE_CSV])
+        assert result.exit_code != 0
+
+    def test_generate_with_explicit_schema(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        schema_file: Path,
+        mock_config,
+    ) -> None:
+        fake_llm = MagicMock()
+        with (
+            patch("schemashift.cli._load_default_llm", return_value=fake_llm),
+            patch("schemashift.llm.generate_config", return_value=mock_config) as mock_gen,
+        ):
+            result = runner.invoke(
+                cli,
+                ["generate", SAMPLE_CSV, "--target-schema", str(schema_file)],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "generated_format" in result.output
+        mock_gen.assert_called_once()
+
+    def test_generate_with_registry_schemas_dir(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        mock_config,
+    ) -> None:
+        schemas_dir = tmp_path / "schemas"
+        schemas_dir.mkdir()
+        (schemas_dir / "schema.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
+
+        fake_llm = MagicMock()
+        with (
+            patch("schemashift.cli._load_default_llm", return_value=fake_llm),
+            patch("schemashift.llm.generate_config", return_value=mock_config),
+        ):
+            result = runner.invoke(
+                cli,
+                ["generate", SAMPLE_CSV, "--registry", str(tmp_path)],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "generated_format" in result.output
+
+    def test_generate_writes_output_file(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        schema_file: Path,
+        mock_config,
+    ) -> None:
+        out_file = tmp_path / "out.json"
+        fake_llm = MagicMock()
+        with (
+            patch("schemashift.cli._load_default_llm", return_value=fake_llm),
+            patch("schemashift.llm.generate_config", return_value=mock_config),
+        ):
+            result = runner.invoke(
+                cli,
+                [
+                    "generate",
+                    SAMPLE_CSV,
+                    "--target-schema",
+                    str(schema_file),
+                    "--output",
+                    str(out_file),
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert out_file.exists()
+        data = json.loads(out_file.read_text())
+        assert data["name"] == "generated_format"
+
+    def test_generate_registers_config_when_registry_given(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        schema_file: Path,
+        mock_config,
+    ) -> None:
+        reg_dir = tmp_path / "registry"
+        reg_dir.mkdir()
+        fake_llm = MagicMock()
+        with (
+            patch("schemashift.cli._load_default_llm", return_value=fake_llm),
+            patch("schemashift.llm.generate_config", return_value=mock_config),
+        ):
+            result = runner.invoke(
+                cli,
+                [
+                    "generate",
+                    SAMPLE_CSV,
+                    "--target-schema",
+                    str(schema_file),
+                    "--registry",
+                    str(reg_dir),
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert (reg_dir / "generated_format.json").exists()
+
+    def test_generate_interactive_accept(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        schema_file: Path,
+        mock_config,
+    ) -> None:
+        import polars as pl
+
+        fake_llm = MagicMock()
+        fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
+        with (
+            patch("schemashift.cli._load_default_llm", return_value=fake_llm),
+            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.transform.dry_run", return_value=fake_sample),
+        ):
+            result = runner.invoke(
+                cli,
+                ["generate", SAMPLE_CSV, "--target-schema", str(schema_file), "--interactive"],
+                input="y\n",
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Generated config" in result.output
+        assert "Accept this config?" in result.output
+
+    def test_generate_interactive_reject_aborts(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        schema_file: Path,
+        mock_config,
+    ) -> None:
+        import polars as pl
+
+        fake_llm = MagicMock()
+        fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
+        with (
+            patch("schemashift.cli._load_default_llm", return_value=fake_llm),
+            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.transform.dry_run", return_value=fake_sample),
+        ):
+            result = runner.invoke(
+                cli,
+                ["generate", SAMPLE_CSV, "--target-schema", str(schema_file), "--interactive"],
+                input="n\n",
+            )
+
+        assert result.exit_code != 0
+        assert "rejected" in result.output.lower() or "Aborting" in result.output

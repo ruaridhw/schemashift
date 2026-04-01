@@ -17,6 +17,7 @@ from schemashift.errors import DSLSyntaxError
 from .ast_nodes import (
     ASTNode,
     BinaryOp,
+    Coalesce,
     ColRef,
     Literal,
     MethodCall,
@@ -42,6 +43,7 @@ _STR_METHODS: frozenset[str] = frozenset(
         "to_uppercase",
         "slice",
         "replace",
+        "replace_regex",
         "contains",
         "starts_with",
         "ends_with",
@@ -200,7 +202,9 @@ def tokenize(expression: str) -> list[Token]:
 # Parser
 # ---------------------------------------------------------------------------
 
-_KEYWORDS: frozenset[str] = frozenset({"col", "when", "otherwise", "true", "false", "null"})
+_KEYWORDS: frozenset[str] = frozenset(
+    {"col", "when", "otherwise", "true", "false", "null", "coalesce"}
+)
 
 
 class _Parser:
@@ -375,6 +379,8 @@ class _Parser:
                 return self._col_ref()
             if ident == "when":
                 return self._when_expr()
+            if ident == "coalesce":
+                return self._coalesce_expr()
             # Unknown identifier
             raise DSLSyntaxError(
                 f"Unknown identifier {ident!r}",
@@ -450,6 +456,20 @@ class _Parser:
             expression=self._expr,
             position=self._current_pos(),
         )
+
+    # coalesce_expr := 'coalesce' '(' expression ',' expression (',' expression)* ')'
+    def _coalesce_expr(self) -> Coalesce:
+        self._expect(TT.IDENT, hint="Expected 'coalesce'")
+        self._expect(TT.LPAREN, hint="Expected '(' after 'coalesce'")
+        exprs = self._args()
+        self._expect(TT.RPAREN, hint="Expected ')' to close 'coalesce(...'")
+        if len(exprs) < 2:
+            raise DSLSyntaxError(
+                "coalesce() requires at least 2 arguments",
+                expression=self._expr,
+                position=self._current_pos(),
+            )
+        return Coalesce(tuple(exprs))
 
     # args := expression (',' expression)*
     def _args(self) -> list[ASTNode]:

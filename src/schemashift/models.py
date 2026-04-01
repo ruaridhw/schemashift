@@ -96,6 +96,7 @@ class FormatConfig(BaseModel):
     name: str
     description: str = ""
     version: int = 1
+    target_schema: str | None = None
     reader: ReaderConfig = ReaderConfig()
     columns: list[ColumnMapping]
     drop_unmapped: bool = True

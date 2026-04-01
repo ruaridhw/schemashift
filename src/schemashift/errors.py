@@ -50,6 +50,10 @@ class UnsupportedFileError(SchemaShiftError):
 class LLMGenerationError(SchemaShiftError):
     """Raised when LLM-assisted config generation fails."""
 
+    def __init__(self, message: str, attempts: list[dict] | None = None) -> None:
+        super().__init__(message)
+        self.attempts: list[dict] = attempts if attempts is not None else []
+
 
 class ReaderError(SchemaShiftError):
     """Raised when reading a file fails at the I/O or parsing level."""

@@ -200,3 +200,41 @@ class TestFormatConfigJsonRoundTrip:
         assert restored.columns[1].expr == 'col("net") + col("tax")'
         assert restored.columns[1].fillna == pytest.approx(0.0)
         assert restored.columns[2].constant == "pending"
+
+
+# ---------------------------------------------------------------------------
+# FormatConfig.target_schema
+# ---------------------------------------------------------------------------
+
+
+class TestFormatConfigTargetSchema:
+    def _minimal_columns(self) -> list[dict]:
+        return [{"target": "out", "source": "in"}]
+
+    def test_target_schema_accepted(self) -> None:
+        cfg = FormatConfig(
+            name="test",
+            target_schema="lot_movement",
+            columns=self._minimal_columns(),
+        )
+        assert cfg.target_schema == "lot_movement"
+
+    def test_target_schema_defaults_to_none(self) -> None:
+        cfg = FormatConfig(name="test", columns=self._minimal_columns())
+        assert cfg.target_schema is None
+
+    def test_target_schema_round_trips_json(self) -> None:
+        original = FormatConfig(
+            name="test",
+            target_schema="lot_movement",
+            columns=self._minimal_columns(),
+        )
+        data = original.model_dump()
+        restored = FormatConfig.model_validate(data)
+        assert restored.target_schema == "lot_movement"
+
+    def test_target_schema_none_round_trips_json(self) -> None:
+        original = FormatConfig(name="test", columns=self._minimal_columns())
+        data = original.model_dump()
+        restored = FormatConfig.model_validate(data)
+        assert restored.target_schema is None

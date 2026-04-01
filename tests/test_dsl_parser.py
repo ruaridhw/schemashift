@@ -6,6 +6,7 @@ import pytest
 
 from schemashift.dsl.ast_nodes import (
     BinaryOp,
+    Coalesce,
     ColRef,
     Literal,
     MethodCall,
@@ -500,3 +501,24 @@ class TestSyntaxErrors:
     def test_invalid_character(self) -> None:
         with pytest.raises(DSLSyntaxError):
             parse_dsl("col(\"X\") @ 1")
+
+
+# ---------------------------------------------------------------------------
+# Coalesce
+# ---------------------------------------------------------------------------
+
+
+class TestCoalesce:
+    def test_three_args_produces_coalesce_node(self) -> None:
+        result = parse_dsl('coalesce(col("a"), col("b"), "fallback")')
+        assert result == Coalesce(
+            exprs=(ColRef("a"), ColRef("b"), Literal("fallback"))
+        )
+
+    def test_two_args_is_valid(self) -> None:
+        result = parse_dsl("coalesce(col(\"a\"), 0)")
+        assert result == Coalesce(exprs=(ColRef("a"), Literal(0)))
+
+    def test_one_arg_raises_syntax_error(self) -> None:
+        with pytest.raises(DSLSyntaxError, match="at least 2"):
+            parse_dsl('coalesce(col("a"))')

@@ -67,5 +67,12 @@ class WhenChain:
     otherwise: ASTNode
 
 
+@dataclass(frozen=True)
+class Coalesce:
+    """Return the first non-null value across a list of expressions."""
+
+    exprs: tuple[ASTNode, ...]
+
+
 # Type alias covering every node variant.
-ASTNode = Literal | ColRef | BinaryOp | UnaryOp | MethodCall | WhenClause | WhenChain
+ASTNode = Literal | ColRef | BinaryOp | UnaryOp | MethodCall | WhenClause | WhenChain | Coalesce
