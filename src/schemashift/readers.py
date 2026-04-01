@@ -1,0 +1,115 @@
+"""File readers that return Polars LazyFrames."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import polars as pl
+
+from .errors import ReaderError, UnsupportedFileError
+from .models import ReaderConfig
+
+_EXCEL_EXTENSIONS: frozenset[str] = frozenset({".xlsx", ".xls"})
+
+
+def read_file(path: str | Path, config: ReaderConfig | None = None) -> pl.LazyFrame:
+    """Read a file into a LazyFrame based on its extension.
+
+    Supported extensions: .csv, .tsv, .xlsx, .xls, .parquet, .json
+
+    Args:
+        path: Path to the file.
+        config: Optional reader configuration (skip_rows, separator, encoding, etc.).
+
+    Returns:
+        A Polars LazyFrame.
+
+    Raises:
+        UnsupportedFileError: For unrecognised file extensions.
+        ReaderError: For any I/O or parsing failures.
+    """
+    path = Path(path)
+    cfg = config or ReaderConfig()
+    ext = path.suffix.lower()
+
+    try:
+        if ext == ".csv":
+            return _read_csv(path, cfg, default_sep=",")
+        if ext == ".tsv":
+            return _read_csv(path, cfg, default_sep="\t")
+        if ext in _EXCEL_EXTENSIONS:
+            return _read_excel(path, cfg)
+        if ext == ".parquet":
+            return pl.scan_parquet(path)
+        if ext == ".json":
+            return pl.read_json(path).lazy()
+        raise UnsupportedFileError(
+            f"Unsupported file extension '{ext}' for file: {path}. "
+            f"Supported: .csv, .tsv, .xlsx, .xls, .parquet, .json"
+        )
+    except (UnsupportedFileError, ReaderError):
+        raise
+    except Exception as exc:
+        raise ReaderError(f"Failed to read file '{path}': {exc}") from exc
+
+
+def read_header(path: str | Path, config: ReaderConfig | None = None) -> list[str]:
+    """Read only the column names from a file (useful for format detection).
+
+    Args:
+        path: Path to the file.
+        config: Optional reader configuration.
+
+    Returns:
+        List of column name strings.
+
+    Raises:
+        UnsupportedFileError: For unrecognised file extensions.
+        ReaderError: For any I/O or parsing failures.
+    """
+    lf = read_file(path, config)
+    return lf.collect_schema().names()
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+
+def _normalize_csv_encoding(encoding: str) -> str:
+    """Normalise encoding strings for Polars scan_csv.
+
+    Polars scan_csv only accepts 'utf8' or 'utf8-lossy'.  Common aliases like
+    'utf-8' must be converted before passing through.
+    """
+    _ALIAS_MAP: dict[str, str] = {"utf-8": "utf8", "UTF-8": "utf8", "UTF8": "utf8"}
+    return _ALIAS_MAP.get(encoding, encoding)
+
+
+def _read_csv(path: Path, cfg: ReaderConfig, default_sep: str) -> pl.LazyFrame:
+    sep = cfg.separator if cfg.separator is not None else default_sep
+    return pl.scan_csv(
+        path,
+        separator=sep,
+        skip_rows=cfg.skip_rows,
+        encoding=_normalize_csv_encoding(cfg.encoding),
+    )
+
+
+def _read_excel(path: Path, cfg: ReaderConfig) -> pl.LazyFrame:
+    kwargs: dict = {}
+    if cfg.sheet_name is not None:
+        kwargs["sheet_name"] = cfg.sheet_name
+
+    # fastexcel / openpyxl use sheet_id (1-based) or sheet_name.
+    # When sheet_name is not given we default to the first sheet (index 0 for
+    # read_excel).
+    if cfg.skip_rows:
+        kwargs["skip_rows"] = cfg.skip_rows
+
+    try:
+        df = pl.read_excel(path, **kwargs)
+    except Exception as exc:
+        raise ReaderError(f"Failed to read Excel file '{path}': {exc}") from exc
+
+    return df.lazy()

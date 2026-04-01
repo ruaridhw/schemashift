@@ -1,0 +1,7 @@
+[
+  {"id": 1, "name": "Alice", "amount": 100.50, "category": "food", "active": true},
+  {"id": 2, "name": "Bob", "amount": 250.00, "category": "transport", "active": false},
+  {"id": 3, "name": "Carol", "amount": 75.25, "category": "food", "active": true},
+  {"id": 4, "name": "Dave", "amount": 320.00, "category": "utilities", "active": true},
+  {"id": 5, "name": "Eve", "amount": 45.99, "category": "food", "active": false}
+]

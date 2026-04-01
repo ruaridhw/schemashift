@@ -1,0 +1,6 @@
+id,name,amount,category,active
+1,Alice,100.50,food,true
+2,Bob,250.00,transport,false
+3,Carol,75.25,food,true
+4,Dave,320.00,utilities,true
+5,Eve,45.99,food,false

@@ -1,0 +1,15 @@
+name: "test_schema"
+description: "Test target schema"
+columns:
+  - name: id
+    type: str
+    required: true
+    description: "Unique ID"
+  - name: value
+    type: float64
+    required: true
+    description: "Numeric value"
+  - name: label
+    type: str
+    required: false
+    description: "Optional label"
