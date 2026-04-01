@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 llm = [
     "langchain-core>=0.3",
+    "langchain-anthropic>=0.3",
 ]
 dev = [
     "pytest>=8.0",
