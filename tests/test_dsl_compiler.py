@@ -564,3 +564,29 @@ class TestCompilerErrorPaths:
     def test_cast_invalid_type_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
             parse_and_compile('col("X").cast("pandas")')
+
+
+# ---------------------------------------------------------------------------
+# Coalesce
+# ---------------------------------------------------------------------------
+
+
+class TestCoalesce:
+    def test_coalesce_three_args_returns_first_non_null(self) -> None:
+        df = pl.DataFrame({"x": [1, None, None], "y": [None, 2, None]}, schema={"x": pl.Int64, "y": pl.Int64})
+        result = df.select(parse_and_compile('coalesce(col("x"), col("y"), 0)').alias("out"))["out"].to_list()
+        assert result == [1, 2, 0]
+
+    def test_str_replace_regex_substitutes_pattern(self) -> None:
+        df = pl.DataFrame({"name": ["abc123", "def456"]})
+        result = df.select(
+            parse_and_compile(r'col("name").str.replace_regex("\\d+", "NUM")').alias("out")
+        )["out"].to_list()
+        assert result == ["abcNUM", "defNUM"]
+
+    def test_str_replace_literal_still_works(self) -> None:
+        df = pl.DataFrame({"name": ["a.b", "c.d"]})
+        result = df.select(
+            parse_and_compile('col("name").str.replace(".", "W")').alias("out")
+        )["out"].to_list()
+        assert result == ["aWb", "cWd"]

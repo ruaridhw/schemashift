@@ -11,6 +11,42 @@ from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.target_schema import TargetColumn, TargetSchema
 
 
+class MockLLM:
+    def __init__(self, response: str) -> None:
+        self._response = response
+
+    def invoke(self, prompt: str) -> object:
+        class Msg:
+            pass
+
+        msg = Msg()
+        msg.content = self._response
+        return msg
+
+
+class SequenceLLM:
+    """Returns successive responses from a list, then repeats the last."""
+
+    def __init__(self, responses: list[str]) -> None:
+        self._responses = responses
+        self._calls: list[str] = []
+
+    def invoke(self, prompt: str) -> object:
+        self._calls.append(prompt)
+        idx = min(len(self._calls) - 1, len(self._responses) - 1)
+
+        class Msg:
+            pass
+
+        msg = Msg()
+        msg.content = self._responses[idx]
+        return msg
+
+    @property
+    def call_count(self) -> int:
+        return len(self._calls)
+
+
 class TestExtractJson:
     def test_raw_json(self):
         result = _extract_json('{"name": "test", "columns": []}')
@@ -69,6 +105,13 @@ class TestBuildPrompt:
         prompt = build_prompt(df, schema, ["x"], format_name="my_fmt")
         assert "my_fmt" in prompt
 
+    def test_examples_note_includes_schema_name(self, schema):
+        df = pl.DataFrame({"x": [1]})
+        ex = FormatConfig(name="ex", columns=[ColumnMapping(target="id", source="x")])
+        prompt = build_prompt(df, schema, ["x"], example_configs=[ex])
+        assert "test" in prompt
+        assert "same" in prompt
+
 
 class TestGenerateConfig:
     @pytest.fixture
@@ -87,7 +130,7 @@ class TestGenerateConfig:
             ],
         )
 
-    def _valid_response(self, name="fmt"):
+    def _valid_response(self, name="fmt") -> str:
         return json.dumps(
             {
                 "name": name,
@@ -99,63 +142,51 @@ class TestGenerateConfig:
         )
 
     def test_successful_generation(self, csv_file, schema):
-        config = generate_config(csv_file, schema, llm_fn=lambda p: self._valid_response())
+        config = generate_config(csv_file, schema, llm=MockLLM(self._valid_response()))
         assert config.name == "fmt"
         assert len(config.columns) == 2
 
     def test_uses_path_stem_as_name(self, csv_file, schema):
-        def respond(p):
-            return json.dumps(
-                {
-                    "columns": [
-                        {"target": "student", "source": "Name"},
-                        {"target": "grade", "source": "Score"},
-                    ]
-                }
-            )
-
-        config = generate_config(csv_file, schema, llm_fn=respond)
+        response = json.dumps(
+            {
+                "columns": [
+                    {"target": "student", "source": "Name"},
+                    {"target": "grade", "source": "Score"},
+                ]
+            }
+        )
+        config = generate_config(csv_file, schema, llm=MockLLM(response))
         assert config.name == "data"  # stem of data.csv
 
     def test_retries_on_bad_json(self, csv_file, schema):
-        calls = []
-
-        def respond(p):
-            calls.append(p)
-            if len(calls) == 1:
-                return "not json"
-            return self._valid_response()
-
-        config = generate_config(csv_file, schema, llm_fn=respond, max_retries=2)
-        assert len(calls) == 2
+        llm = SequenceLLM(["not json", self._valid_response()])
+        config = generate_config(csv_file, schema, llm=llm, max_retries=2)
+        assert llm.call_count == 2
 
     def test_retries_on_bad_dsl(self, csv_file, schema):
-        calls = []
-
-        def respond(p):
-            calls.append(p)
-            if len(calls) == 1:
-                return json.dumps(
-                    {
-                        "name": "f",
-                        "columns": [
-                            {"target": "student", "expr": "INVALID!!!"},
-                            {"target": "grade", "source": "Score"},
-                        ],
-                    }
-                )
-            return self._valid_response()
-
-        config = generate_config(csv_file, schema, llm_fn=respond, max_retries=2)
-        assert len(calls) == 2
+        bad_dsl = json.dumps(
+            {
+                "name": "f",
+                "columns": [
+                    {"target": "student", "expr": "INVALID!!!"},
+                    {"target": "grade", "source": "Score"},
+                ],
+            }
+        )
+        llm = SequenceLLM([bad_dsl, self._valid_response()])
+        config = generate_config(csv_file, schema, llm=llm, max_retries=2)
+        assert llm.call_count == 2
 
     def test_raises_after_exhausted_retries(self, csv_file, schema):
         with pytest.raises(LLMGenerationError):
-            generate_config(csv_file, schema, llm_fn=lambda p: "bad", max_retries=1)
+            generate_config(csv_file, schema, llm=MockLLM("bad"), max_retries=1)
 
-    def test_raises_without_llm(self, csv_file, schema):
-        with pytest.raises(ValueError, match="llm"):
-            generate_config(csv_file, schema)
+    def test_error_includes_attempts(self, csv_file, schema):
+        with pytest.raises(LLMGenerationError) as exc_info:
+            generate_config(csv_file, schema, llm=MockLLM("bad"), max_retries=1)
+        err = exc_info.value
+        assert len(err.attempts) == 2
+        assert all("prompt" in a and "response" in a and "error" in a for a in err.attempts)
 
     def test_langchain_style_llm(self, csv_file, schema):
         class FakeLLM:
@@ -175,3 +206,11 @@ class TestGenerateConfig:
 
         config = generate_config(csv_file, schema, llm=FakeLLM())
         assert config.name == "lc"
+
+    def test_warning_logged_on_retry(self, csv_file, schema, caplog):
+        import logging
+
+        llm = SequenceLLM(["not json", self._valid_response()])
+        with caplog.at_level(logging.WARNING, logger="schemashift.llm"):
+            generate_config(csv_file, schema, llm=llm, max_retries=2)
+        assert any("attempt" in r.message.lower() for r in caplog.records)

@@ -14,6 +14,7 @@ from schemashift.errors import DSLRuntimeError, DSLSyntaxError
 from .ast_nodes import (
     ASTNode,
     BinaryOp,
+    Coalesce,
     ColRef,
     Literal,
     MethodCall,
@@ -163,6 +164,9 @@ def compile_dsl(node: ASTNode) -> pl.Expr:  # noqa: C901 (complex but intentiona
         case WhenClause():
             raise DSLRuntimeError("WhenClause cannot be compiled standalone; use WhenChain.")
 
+        case Coalesce(exprs):
+            return pl.coalesce([compile_dsl(e) for e in exprs])
+
         case _:
             raise DSLRuntimeError(f"Unknown AST node type: {type(node).__name__}")
 
@@ -234,6 +238,12 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
             old = _literal_str(args[0], method)
             new = _literal_str(args[1], method)
             return base.str.replace(old, new, literal=True)
+
+        case "str.replace_regex":
+            _expect_arity(method, args, 2)
+            pattern = _literal_str(args[0], method)
+            replacement = _literal_str(args[1], method)
+            return base.str.replace(pattern, replacement, literal=False)
 
         case "str.contains":
             _expect_arity(method, args, 1)

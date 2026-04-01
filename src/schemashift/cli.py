@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from schemashift.target_schema import TargetSchema
 
 import click
 import polars as pl
@@ -97,18 +100,30 @@ def dry_run(config_path: str, sample: str, rows: int) -> None:
 
 @cli.command()
 @click.argument("file")
-@click.option("--target-schema", "-t", required=True, help="Path to target schema YAML.")
+@click.option(
+    "--target-schema",
+    "-t",
+    help="Path to target schema YAML. If omitted, looks in --registry/schemas/",
+)
 @click.option("--output", "-o", help="Output path for generated config JSON.")
 @click.option("--registry", "-r", help="Registry directory (auto-register if provided).")
 @click.option("--name", "-n", help="Name for the generated config.")
 @click.option("--rows", default=15, show_default=True, help="Sample rows for LLM.")
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    default=False,
+    help="Interactively review generated config before saving.",
+)
 def generate(  # noqa: PLR0913
     file: str,
-    target_schema: str,
+    target_schema: str | None,
     output: str | None,
     registry: str | None,
     name: str | None,
     rows: int,
+    interactive: bool,
 ) -> None:
     """Generate a FormatConfig for an unknown file using an LLM.
 
@@ -117,9 +132,8 @@ def generate(  # noqa: PLR0913
     """
     try:
         from schemashift.llm import generate_config
-        from schemashift.target_schema import TargetSchema
 
-        schema = TargetSchema.from_yaml(target_schema)
+        schema = _resolve_schema(target_schema, registry)
 
         # Try to load LangChain LLM from environment
         llm = _load_default_llm()
@@ -134,6 +148,20 @@ def generate(  # noqa: PLR0913
             sample_rows=rows,
         )
 
+        if interactive:
+            click.echo("\nGenerated config:")
+            click.echo(config.model_dump_json(indent=2))
+
+            from schemashift.transform import dry_run
+
+            sample = dry_run(config, file, n_rows=5)
+            click.echo("\nSample output (first 5 rows):")
+            click.echo(str(sample))
+
+            if not click.confirm("\nAccept this config?", default=False):
+                click.echo("Config rejected. Aborting.", err=True)
+                sys.exit(1)
+
         if reg is not None:
             reg.register(config)
             click.echo(f"Registered config '{config.name}' in '{registry}'.")
@@ -145,6 +173,8 @@ def generate(  # noqa: PLR0913
         else:
             click.echo(config_json)
 
+    except click.UsageError:
+        raise
     except ImportError as exc:
         click.echo(
             f"LangChain not installed: {exc}\nInstall with: pip install schemashift[llm]",
@@ -176,6 +206,40 @@ def list_configs(registry: str) -> None:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _resolve_schema(
+    target_schema_path: str | None, registry_path: str | None
+) -> TargetSchema:
+    """Resolve a TargetSchema from an explicit path or a registry schemas/ dir.
+
+    Resolution order:
+    1. If *target_schema_path* is given, load it directly.
+    2. If *registry_path* is given, glob for ``*.yaml``/``*.yml`` in
+       ``{registry_path}/schemas/``.  Exactly one match is required.
+    3. Otherwise raise :class:`click.UsageError`.
+    """
+    from schemashift.target_schema import TargetSchema
+
+    if target_schema_path is not None:
+        return TargetSchema.from_yaml(target_schema_path)
+
+    if registry_path is not None:
+        schemas_dir = Path(registry_path) / "schemas"
+        if schemas_dir.exists():
+            yamls = list(schemas_dir.glob("*.yaml")) + list(schemas_dir.glob("*.yml"))
+            if len(yamls) == 1:
+                return TargetSchema.from_yaml(yamls[0])
+            elif len(yamls) > 1:
+                names = [y.name for y in yamls]
+                raise click.UsageError(
+                    f"Multiple schemas found in '{schemas_dir}': {names}. "
+                    f"Use --target-schema to specify one."
+                )
+
+    raise click.UsageError(
+        "Provide --target-schema or --registry with a schemas/ subdirectory."
+    )
 
 
 def _load_default_llm() -> Any:

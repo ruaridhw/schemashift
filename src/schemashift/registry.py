@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from schemashift.models import FormatConfig
+
+if TYPE_CHECKING:
+    from schemashift.target_schema import TargetSchema
 
 
 class Registry(ABC):
@@ -91,3 +95,31 @@ class FileSystemRegistry(Registry):
             p.unlink()
             return True
         return False
+
+    def load_schema(self, name: str | None = None) -> TargetSchema | None:
+        """Load a TargetSchema from the schemas/ subdirectory.
+
+        If *name* is provided, loads ``{schemas_dir}/{name}.yaml`` (falling
+        back to ``.yml``).  If *name* is ``None`` and exactly one schema file
+        exists, returns it.  Returns ``None`` if the ``schemas/`` directory
+        does not exist, is empty, or the named file is not found.
+        """
+        from schemashift.target_schema import TargetSchema
+
+        schemas_dir = self._path / "schemas"
+        if not schemas_dir.exists():
+            return None
+
+        if name is not None:
+            path = schemas_dir / f"{name}.yaml"
+            if path.exists():
+                return TargetSchema.from_yaml(path)
+            path = schemas_dir / f"{name}.yml"
+            if path.exists():
+                return TargetSchema.from_yaml(path)
+            return None
+
+        yamls = list(schemas_dir.glob("*.yaml")) + list(schemas_dir.glob("*.yml"))
+        if len(yamls) == 1:
+            return TargetSchema.from_yaml(yamls[0])
+        return None

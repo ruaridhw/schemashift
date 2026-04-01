@@ -177,7 +177,6 @@ def smart_transform(
     registry: Registry,
     target_schema: TargetSchema | None = None,
     llm: Any = None,
-    llm_fn: Callable[[str], str] | None = None,
     review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
     auto_register: bool = False,
     example_configs: list[FormatConfig] | None = None,
@@ -197,7 +196,6 @@ def smart_transform(
         registry: Registry to search and optionally register to.
         target_schema: Required for LLM generation and output validation.
         llm: LangChain BaseChatModel.
-        llm_fn: Simple callable(prompt) -> str.
         review_fn: callback(config, sample_df) -> config | None. None = reject.
         auto_register: Register LLM-generated config automatically.
         example_configs: Example configs for LLM prompt.
@@ -226,7 +224,7 @@ def smart_transform(
         return lf
 
     # No match — need LLM
-    if llm is None and llm_fn is None:
+    if llm is None:
         raise FormatDetectionError(
             f"No registered config matches '{path}' and no LLM is configured. "
             f"File columns: {columns}"
@@ -240,7 +238,6 @@ def smart_transform(
         path=str(path),
         target_schema=target_schema,
         llm=llm,
-        llm_fn=llm_fn,
         example_configs=example_configs,
         max_retries=max_retries,
         sample_rows=sample_rows,
