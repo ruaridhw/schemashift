@@ -17,7 +17,7 @@ from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
 from schemashift.target_schema import TargetSchema
-from schemashift.transform import auto_transform, dry_run, transform, validate_config
+from schemashift.transform import auto_transform, dry_run, smart_transform, transform, validate_config
 
 __all__ = [
     "ColumnMapping",
@@ -29,6 +29,7 @@ __all__ = [
     "Registry",
     "auto_transform",
     "dry_run",
+    "smart_transform",
     "transform",
     "validate_config",
     "detect_format",

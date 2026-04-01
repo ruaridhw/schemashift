@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
@@ -11,6 +13,9 @@ from schemashift.errors import DSLRuntimeError, DSLSyntaxError, FormatDetectionE
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.readers import read_file
 from schemashift.registry import Registry
+
+if TYPE_CHECKING:
+    from schemashift.target_schema import TargetSchema
 
 # ---------------------------------------------------------------------------
 # Dtype mapping
@@ -165,6 +170,97 @@ def auto_transform(
         )
 
     return transform(path, config)
+
+
+def smart_transform(
+    path: str | Path,
+    registry: Registry,
+    target_schema: TargetSchema | None = None,
+    llm: Any = None,
+    llm_fn: Callable[[str], str] | None = None,
+    review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
+    auto_register: bool = False,
+    example_configs: list[FormatConfig] | None = None,
+    max_retries: int = 2,
+    sample_rows: int = 15,
+) -> pl.LazyFrame:
+    """Full detect-or-generate flow.
+
+    1. Try auto-detect from registry.
+    2. If miss and LLM available: generate config.
+    3. If review_fn provided: pass config + sample to reviewer.
+    4. If auto_register: save to registry.
+    5. Apply config; optionally validate against target_schema.
+
+    Args:
+        path: Source file path.
+        registry: Registry to search and optionally register to.
+        target_schema: Required for LLM generation and output validation.
+        llm: LangChain BaseChatModel.
+        llm_fn: Simple callable(prompt) -> str.
+        review_fn: callback(config, sample_df) -> config | None. None = reject.
+        auto_register: Register LLM-generated config automatically.
+        example_configs: Example configs for LLM prompt.
+        max_retries: Max LLM retries.
+        sample_rows: Rows to sample for LLM.
+
+    Returns:
+        Transformed pl.LazyFrame.
+
+    Raises:
+        FormatDetectionError: No match and no LLM, or review_fn rejected.
+        ValueError: LLM needed but target_schema not provided.
+        LLMGenerationError: LLM fails after all retries.
+    """
+    from schemashift.detection import detect_format
+    from schemashift.readers import read_header
+
+    # Try registry
+    columns = read_header(path)
+    config = detect_format(columns, registry)
+
+    if config is not None:
+        lf = transform(path, config)
+        if target_schema is not None:
+            target_schema.validate_lazy(lf)
+        return lf
+
+    # No match — need LLM
+    if llm is None and llm_fn is None:
+        raise FormatDetectionError(
+            f"No registered config matches '{path}' and no LLM is configured. "
+            f"File columns: {columns}"
+        )
+    if target_schema is None:
+        raise ValueError("target_schema is required for LLM config generation")
+
+    from schemashift.llm import generate_config as _llm_generate
+
+    config = _llm_generate(
+        path=str(path),
+        target_schema=target_schema,
+        llm=llm,
+        llm_fn=llm_fn,
+        example_configs=example_configs,
+        max_retries=max_retries,
+        sample_rows=sample_rows,
+    )
+
+    # Review callback
+    if review_fn is not None:
+        sample_df = dry_run(config, path, n_rows=10)
+        reviewed = review_fn(config, sample_df)
+        if reviewed is None:
+            raise FormatDetectionError("Config was rejected by review_fn")
+        config = reviewed
+
+    if auto_register:
+        registry.register(config)
+
+    lf = transform(path, config)
+    if target_schema is not None:
+        target_schema.validate_lazy(lf)
+    return lf
 
 
 # ---------------------------------------------------------------------------
