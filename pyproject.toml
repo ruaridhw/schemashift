@@ -68,3 +68,8 @@ known_first_party = ["schemashift"]
 
 [tool.coverage.run]
 source = ["schemashift"]
+
+[dependency-groups]
+dev = [
+    "openpyxl>=3.1.5",
+]

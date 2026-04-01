@@ -1,0 +1,51 @@
+name: "lot_movement"
+description: "Canonical lot/wafer movement record across process steps"
+columns:
+  - name: lot_id
+    type: str
+    required: true
+    description: "Lot identifier"
+  - name: wafer_count
+    type: int32
+    required: true
+    description: "Number of wafers in the lot"
+  - name: operation
+    type: str
+    required: true
+    description: "Process step name or ID"
+  - name: step_sequence
+    type: int32
+    required: false
+    description: "Numeric ordering of the step in the route"
+  - name: tool_id
+    type: str
+    required: true
+    description: "Equipment ID where the operation ran"
+  - name: track_in_time
+    type: datetime
+    required: true
+    description: "Timestamp when the lot entered the tool (UTC)"
+  - name: track_out_time
+    type: datetime
+    required: false
+    description: "Timestamp when the lot exited the tool (UTC)"
+  - name: recipe
+    type: str
+    required: true
+    description: "Process recipe used"
+  - name: route
+    type: str
+    required: false
+    description: "Route or flow the lot is following"
+  - name: priority
+    type: int32
+    required: false
+    description: "Lot priority (1 = hot lot, higher = lower priority)"
+  - name: hold_flag
+    type: bool
+    required: true
+    description: "Whether the lot is currently on hold"
+  - name: data_source
+    type: str
+    required: true
+    description: "Source system identifier"

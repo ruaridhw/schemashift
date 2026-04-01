@@ -98,14 +98,19 @@ def _read_csv(path: Path, cfg: ReaderConfig, default_sep: str) -> pl.LazyFrame:
 
 def _read_excel(path: Path, cfg: ReaderConfig) -> pl.LazyFrame:
     kwargs: dict = {}
-    if cfg.sheet_name is not None:
+
+    # sheet_name accepts a string name; integers are treated as 0-based sheet
+    # indices and mapped to the 1-based sheet_id parameter that pl.read_excel
+    # expects.
+    if isinstance(cfg.sheet_name, int):
+        kwargs["sheet_id"] = cfg.sheet_name + 1
+    elif cfg.sheet_name is not None:
         kwargs["sheet_name"] = cfg.sheet_name
 
-    # fastexcel / openpyxl use sheet_id (1-based) or sheet_name.
-    # When sheet_name is not given we default to the first sheet (index 0 for
-    # read_excel).
+    # The calamine (fastexcel) engine receives skip_rows via read_options as
+    # header_row, which is the 0-based row index of the header row.
     if cfg.skip_rows:
-        kwargs["skip_rows"] = cfg.skip_rows
+        kwargs["read_options"] = {"header_row": cfg.skip_rows}
 
     try:
         df = pl.read_excel(path, **kwargs)

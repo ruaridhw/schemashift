@@ -1,0 +1,19 @@
+{
+  "name": "camstar_lot_movement",
+  "description": "Camstar MES lot movement export",
+  "reader": { "skip_rows": 0 },
+  "columns": [
+    { "target": "lot_id", "source": "LOT_ID" },
+    { "target": "wafer_count", "source": "QTY", "dtype": "int32" },
+    { "target": "operation", "source": "CURRENT_OPER" },
+    { "target": "step_sequence", "source": "OPER_SEQ", "dtype": "int32" },
+    { "target": "tool_id", "source": "RESOURCE" },
+    { "target": "track_in_time", "expr": "col(\"TRACKIN_DT\").str.to_datetime(\"%Y-%m-%d %H:%M:%S\")" },
+    { "target": "track_out_time", "expr": "col(\"TRACKOUT_DT\").str.to_datetime(\"%Y-%m-%d %H:%M:%S\")" },
+    { "target": "recipe", "source": "RECIPE_NAME" },
+    { "target": "route", "source": "FLOW" },
+    { "target": "priority", "source": "LOT_PRIORITY", "dtype": "int32" },
+    { "target": "hold_flag", "expr": "col(\"HOLD_STATUS\") != \"NONE\"" },
+    { "target": "data_source", "constant": "camstar" }
+  ]
+}

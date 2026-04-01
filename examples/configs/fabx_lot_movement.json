@@ -1,0 +1,19 @@
+{
+  "name": "fabx_lot_movement",
+  "description": "FabX custom WIP export (TSV, Unix timestamps)",
+  "reader": { "separator": "\t" },
+  "columns": [
+    { "target": "lot_id", "source": "lot" },
+    { "target": "wafer_count", "source": "wfrs", "dtype": "int32" },
+    { "target": "operation", "source": "op_code" },
+    { "target": "step_sequence", "source": "seq", "dtype": "int32" },
+    { "target": "tool_id", "source": "tool" },
+    { "target": "track_in_time", "expr": "col(\"t_in\").cast(\"int64\") * 1000000", "dtype": "datetime" },
+    { "target": "track_out_time", "expr": "col(\"t_out\").cast(\"int64\") * 1000000", "dtype": "datetime" },
+    { "target": "recipe", "source": "recipe" },
+    { "target": "route", "source": "route" },
+    { "target": "priority", "source": "prio", "dtype": "int32" },
+    { "target": "hold_flag", "expr": "col(\"hold\") == 1" },
+    { "target": "data_source", "constant": "fabx" }
+  ]
+}
