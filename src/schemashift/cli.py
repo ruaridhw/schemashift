@@ -173,14 +173,8 @@ def generate(  # noqa: PLR0913
         else:
             click.echo(config_json)
 
-    except click.UsageError:
+    except (click.UsageError, click.ClickException):
         raise
-    except ImportError as exc:
-        click.echo(
-            f"LangChain not installed: {exc}\nInstall with: pip install schemashift[llm]",
-            err=True,
-        )
-        sys.exit(1)
     except Exception as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
@@ -243,18 +237,34 @@ def _resolve_schema(
 
 
 def _load_default_llm() -> Any:
-    """Try to load a default LangChain LLM from environment variables."""
+    """Load a LangChain LLM from environment variables.
+
+    Prefers Anthropic (claude-haiku-4-5) when ANTHROPIC_API_KEY is set,
+    falls back to OpenAI (gpt-4o-mini) when OPENAI_API_KEY is set.
+    """
     import os
 
     if os.getenv("ANTHROPIC_API_KEY"):
-        from langchain_anthropic import ChatAnthropic
-
+        try:
+            from langchain_anthropic import ChatAnthropic
+        except ImportError:
+            raise click.ClickException(
+                "langchain-anthropic is not installed. Run: uv add 'schemashift[llm]'"
+            )
         return ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
-    elif os.getenv("OPENAI_API_KEY"):
-        from langchain_openai import ChatOpenAI
 
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise click.ClickException(
+                "langchain-openai is not installed. Run: pip install langchain-openai"
+            )
         return ChatOpenAI(model="gpt-4o-mini", temperature=0)
-    raise ImportError("No LLM API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.")
+
+    raise click.ClickException(
+        "No LLM API key found. Set ANTHROPIC_API_KEY (recommended) or OPENAI_API_KEY."
+    )
 
 
 def _load_format_config(path: str) -> FormatConfig:
