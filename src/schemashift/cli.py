@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 import polars as pl
@@ -94,6 +95,67 @@ def dry_run(config_path: str, sample: str, rows: int) -> None:
         sys.exit(1)
 
 
+@cli.command()
+@click.argument("file")
+@click.option("--target-schema", "-t", required=True, help="Path to target schema YAML.")
+@click.option("--output", "-o", help="Output path for generated config JSON.")
+@click.option("--registry", "-r", help="Registry directory (auto-register if provided).")
+@click.option("--name", "-n", help="Name for the generated config.")
+@click.option("--rows", default=15, show_default=True, help="Sample rows for LLM.")
+def generate(  # noqa: PLR0913
+    file: str,
+    target_schema: str,
+    output: str | None,
+    registry: str | None,
+    name: str | None,
+    rows: int,
+) -> None:
+    """Generate a FormatConfig for an unknown file using an LLM.
+
+    Requires ANTHROPIC_API_KEY or OPENAI_API_KEY in environment,
+    or configure your LLM via environment variables.
+    """
+    try:
+        from schemashift.llm import generate_config
+        from schemashift.target_schema import TargetSchema
+
+        schema = TargetSchema.from_yaml(target_schema)
+
+        # Try to load LangChain LLM from environment
+        llm = _load_default_llm()
+
+        reg = FileSystemRegistry(registry) if registry else None
+
+        config = generate_config(
+            path=file,
+            target_schema=schema,
+            llm=llm,
+            format_name=name,
+            sample_rows=rows,
+        )
+
+        if reg is not None:
+            reg.register(config)
+            click.echo(f"Registered config '{config.name}' in '{registry}'.")
+
+        config_json = config.model_dump_json(indent=2)
+        if output:
+            Path(output).write_text(config_json, encoding="utf-8")
+            click.echo(f"Config written to '{output}'.")
+        else:
+            click.echo(config_json)
+
+    except ImportError as exc:
+        click.echo(
+            f"LangChain not installed: {exc}\nInstall with: pip install schemashift[llm]",
+            err=True,
+        )
+        sys.exit(1)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+
 @cli.command(name="list")
 @click.option("--registry", "-r", required=True, help="Registry directory.")
 def list_configs(registry: str) -> None:
@@ -114,6 +176,21 @@ def list_configs(registry: str) -> None:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _load_default_llm() -> Any:
+    """Try to load a default LangChain LLM from environment variables."""
+    import os
+
+    if os.getenv("ANTHROPIC_API_KEY"):
+        from langchain_anthropic import ChatAnthropic
+
+        return ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
+    elif os.getenv("OPENAI_API_KEY"):
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    raise ImportError("No LLM API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY.")
 
 
 def _load_format_config(path: str) -> FormatConfig:
