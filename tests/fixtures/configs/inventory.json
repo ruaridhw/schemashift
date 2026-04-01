@@ -1,0 +1,11 @@
+{
+  "name": "inventory",
+  "description": "Inventory data mapping",
+  "version": 1,
+  "reader": {},
+  "columns": [
+    {"target": "sku", "source": "sku_code"},
+    {"target": "qty", "source": "quantity"}
+  ],
+  "drop_unmapped": true
+}

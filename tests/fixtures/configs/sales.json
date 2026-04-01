@@ -1,0 +1,17 @@
+{
+  "name": "sales",
+  "description": "Sales data mapping",
+  "version": 1,
+  "reader": {
+    "skip_rows": 0,
+    "separator": null,
+    "encoding": "utf-8"
+  },
+  "columns": [
+    {"target": "identifier", "source": "id"},
+    {"target": "customer", "source": "name"},
+    {"target": "amount_cents", "expr": "col(\"amount\") * 100", "dtype": "int64"},
+    {"target": "flag", "constant": "processed"}
+  ],
+  "drop_unmapped": true
+}
