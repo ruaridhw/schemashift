@@ -30,9 +30,7 @@ from .ast_nodes import (
 # Allowlisted methods
 # ---------------------------------------------------------------------------
 
-_DIRECT_METHODS: frozenset[str] = frozenset(
-    {"round", "abs", "cast", "fill_null", "is_null"}
-)
+_DIRECT_METHODS: frozenset[str] = frozenset({"round", "abs", "cast", "fill_null", "is_null"})
 
 _STR_METHODS: frozenset[str] = frozenset(
     {
@@ -53,9 +51,7 @@ _STR_METHODS: frozenset[str] = frozenset(
     }
 )
 
-_DT_METHODS: frozenset[str] = frozenset(
-    {"year", "month", "day", "hour", "minute", "second", "strftime", "timestamp"}
-)
+_DT_METHODS: frozenset[str] = frozenset({"year", "month", "day", "hour", "minute", "second", "strftime", "timestamp"})
 
 
 def _is_allowed_method(namespace: str, name: str) -> bool:
@@ -88,12 +84,12 @@ class TT(Enum):
     STAR = auto()
     SLASH = auto()
     PERCENT = auto()
-    EQ = auto()   # ==
-    NE = auto()   # !=
-    GT = auto()   # >
-    LT = auto()   # <
-    GE = auto()   # >=
-    LE = auto()   # <=
+    EQ = auto()  # ==
+    NE = auto()  # !=
+    GT = auto()  # >
+    LT = auto()  # <
+    GE = auto()  # >=
+    LE = auto()  # <=
     AMP = auto()  # &
     PIPE = auto()  # |
     EOF = auto()
@@ -102,7 +98,7 @@ class TT(Enum):
 class Token(NamedTuple):
     type: TT
     value: object  # str | int | float
-    pos: int       # character offset in source
+    pos: int  # character offset in source
 
 
 # Regex patterns for tokenizing (order matters).
@@ -191,6 +187,7 @@ def tokenize(expression: str) -> list[Token]:
         elif kind == "STRING":
             tokens.append(Token(TT.STRING, _unescape_string(text), pos))
         else:
+            assert kind is not None
             tt = _TT_MAP[kind]
             tokens.append(Token(tt, text, pos))
         pos = m.end()
@@ -202,9 +199,7 @@ def tokenize(expression: str) -> list[Token]:
 # Parser
 # ---------------------------------------------------------------------------
 
-_KEYWORDS: frozenset[str] = frozenset(
-    {"col", "when", "otherwise", "true", "false", "null", "coalesce"}
-)
+_KEYWORDS: frozenset[str] = frozenset({"col", "when", "otherwise", "true", "false", "null", "coalesce"})
 
 
 class _Parser:

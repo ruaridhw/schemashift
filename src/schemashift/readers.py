@@ -44,8 +44,7 @@ def read_file(path: str | Path, config: ReaderConfig | None = None) -> pl.LazyFr
         if ext == ".json":
             return pl.read_json(path).lazy()
         raise UnsupportedFileError(
-            f"Unsupported file extension '{ext}' for file: {path}. "
-            f"Supported: .csv, .tsv, .xlsx, .xls, .parquet, .json"
+            f"Unsupported file extension '{ext}' for file: {path}. Supported: .csv, .tsv, .xlsx, .xls, .parquet, .json"
         )
     except (UnsupportedFileError, ReaderError):
         raise
@@ -92,7 +91,7 @@ def _read_csv(path: Path, cfg: ReaderConfig, default_sep: str) -> pl.LazyFrame:
         path,
         separator=sep,
         skip_rows=cfg.skip_rows,
-        encoding=_normalize_csv_encoding(cfg.encoding),
+        encoding=_normalize_csv_encoding(cfg.encoding),  # ty: ignore[invalid-argument-type]
     )
 
 

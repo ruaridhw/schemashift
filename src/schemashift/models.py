@@ -70,10 +70,7 @@ class ColumnMapping(BaseModel):
     @classmethod
     def _validate_dtype(cls, value: str | None) -> str | None:
         if value is not None and value not in _VALID_DTYPES:
-            raise ConfigValidationError(
-                f"Invalid dtype '{value}'. "
-                f"Valid values are: {sorted(_VALID_DTYPES)}"
-            )
+            raise ConfigValidationError(f"Invalid dtype '{value}'. Valid values are: {sorted(_VALID_DTYPES)}")
         return value
 
 
@@ -112,8 +109,7 @@ class FormatConfig(BaseModel):
             seen.add(t)
         if duplicates:
             raise ConfigValidationError(
-                f"FormatConfig '{self.name}': duplicate target column names: "
-                f"{sorted(set(duplicates))}"
+                f"FormatConfig '{self.name}': duplicate target column names: {sorted(set(duplicates))}"
             )
         return self
 
