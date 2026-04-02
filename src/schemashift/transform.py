@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # Dtype mapping
 # ---------------------------------------------------------------------------
 
-DTYPE_MAP: dict[str, pl.PolarsDataType] = {
+DTYPE_MAP: dict[str, type[pl.DataType]] = {
     "str": pl.Utf8,
     "string": pl.Utf8,
     "utf8": pl.Utf8,
@@ -103,20 +103,13 @@ def validate_config(config: FormatConfig) -> list[str]:
             try:
                 parse_and_compile(mapping.expr)
             except DSLSyntaxError as exc:
-                errors.append(
-                    f"Column '{mapping.target}': DSL syntax error in expr "
-                    f"{mapping.expr!r}: {exc}"
-                )
+                errors.append(f"Column '{mapping.target}': DSL syntax error in expr {mapping.expr!r}: {exc}")
             except Exception as exc:
-                errors.append(
-                    f"Column '{mapping.target}': unexpected error parsing expr "
-                    f"{mapping.expr!r}: {exc}"
-                )
+                errors.append(f"Column '{mapping.target}': unexpected error parsing expr {mapping.expr!r}: {exc}")
 
         if mapping.dtype is not None and mapping.dtype not in DTYPE_MAP:
             errors.append(
-                f"Column '{mapping.target}': unknown dtype {mapping.dtype!r}. "
-                f"Valid dtypes: {sorted(DTYPE_MAP)}"
+                f"Column '{mapping.target}': unknown dtype {mapping.dtype!r}. Valid dtypes: {sorted(DTYPE_MAP)}"
             )
 
     return errors
@@ -137,7 +130,8 @@ def dry_run(config: FormatConfig, path: str | Path, n_rows: int = 10) -> pl.Data
         Any error raised by :func:`transform` or Polars collection.
     """
     lf = transform(path, config)
-    return lf.limit(n_rows).collect()
+    result: pl.DataFrame = lf.limit(n_rows).collect()  # ty: ignore[invalid-assignment]
+    return result
 
 
 def auto_transform(
@@ -165,8 +159,7 @@ def auto_transform(
 
     if config is None:
         raise FormatDetectionError(
-            f"No registered config matches the columns found in '{path}'. "
-            f"Columns present: {columns}"
+            f"No registered config matches the columns found in '{path}'. Columns present: {columns}"
         )
 
     return transform(path, config)
@@ -226,8 +219,7 @@ def smart_transform(
     # No match — need LLM
     if llm is None:
         raise FormatDetectionError(
-            f"No registered config matches '{path}' and no LLM is configured. "
-            f"File columns: {columns}"
+            f"No registered config matches '{path}' and no LLM is configured. File columns: {columns}"
         )
     if target_schema is None:
         raise ValueError("target_schema is required for LLM config generation")
@@ -290,9 +282,11 @@ def _mapping_to_expr(mapping: ColumnMapping) -> pl.Expr:
                 target=mapping.target,
             ) from exc
         expr = compiled.alias(mapping.target)
-    else:
+    elif mapping.constant is not None:
         # constant
         expr = pl.lit(mapping.constant).alias(mapping.target)
+    else:
+        raise ValueError(f"ColumnMapping {mapping} has neither source nor expr nor constant")
 
     # Apply dtype casting
     if mapping.dtype is not None:

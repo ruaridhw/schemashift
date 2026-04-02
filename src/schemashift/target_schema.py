@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from .errors import SchemaValidationError
 
-_DTYPE_MAP: dict[str, pl.DataType] = {
+_DTYPE_MAP: dict[str, type[pl.DataType]] = {
     "str": pl.Utf8,
     "utf8": pl.Utf8,
     "float32": pl.Float32,
@@ -63,7 +63,7 @@ class TargetSchema(BaseModel):
         """Return names of columns marked as required."""
         return [col.name for col in self.columns if col.required]
 
-    def polars_dtype(self, type_str: str) -> pl.DataType:
+    def polars_dtype(self, type_str: str) -> type[pl.DataType]:
         """Convert a type string like 'float64' to the corresponding Polars DataType.
 
         Raises:
@@ -73,8 +73,7 @@ class TargetSchema(BaseModel):
             return _DTYPE_MAP[type_str]
         except KeyError as exc:
             raise SchemaValidationError(
-                f"Unknown type string '{type_str}'. "
-                f"Valid values: {sorted(_DTYPE_MAP)}"
+                f"Unknown type string '{type_str}'. Valid values: {sorted(_DTYPE_MAP)}"
             ) from exc
 
     def validate_lazy(self, lf: pl.LazyFrame) -> None:
@@ -98,15 +97,10 @@ class TargetSchema(BaseModel):
             # Compare base type class rather than instances to avoid parameter mismatches
             # (e.g. Datetime(time_unit=...) vs Datetime).
             if not _dtypes_compatible(actual_dtype, expected_dtype):
-                errors.append(
-                    f"Column '{col.name}': expected dtype {expected_dtype}, "
-                    f"got {actual_dtype}"
-                )
+                errors.append(f"Column '{col.name}': expected dtype {expected_dtype}, got {actual_dtype}")
 
         if errors:
-            raise SchemaValidationError(
-                "Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
-            )
+            raise SchemaValidationError("Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
     def validate_eager(self, df: pl.DataFrame) -> None:
         """Full validation: columns, dtypes, and null checks on required columns.
@@ -121,23 +115,18 @@ class TargetSchema(BaseModel):
             if col.required and col.name in df.columns:
                 null_count = df[col.name].null_count()
                 if null_count > 0:
-                    errors.append(
-                        f"Required column '{col.name}' has {null_count} null value(s)"
-                    )
+                    errors.append(f"Required column '{col.name}' has {null_count} null value(s)")
 
         if errors:
-            raise SchemaValidationError(
-                "Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors)
-            )
+            raise SchemaValidationError("Schema validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
 
 
-def _dtypes_compatible(actual: pl.DataType, expected: pl.DataType) -> bool:
+def _dtypes_compatible(actual: pl.DataType, expected: type[pl.DataType]) -> bool:
     """Return True when *actual* satisfies *expected*.
 
     ``expected`` is a DataType class (e.g. ``pl.Int64``), while ``actual`` is
     a DataType instance returned from a LazyFrame schema.  Using ``isinstance``
-    handles both exact matches and parameterised types like
-    ``Datetime(time_unit='us')`` comparing equal to the bare ``Datetime`` class.
+    handles parameterised types like ``Datetime(time_unit='us')`` matching the
+    bare ``Datetime`` class.
     """
-    # expected may be a class (DataTypeClass) — isinstance works for both.
-    return isinstance(actual, expected)  # type: ignore[arg-type]
+    return isinstance(actual, expected)
