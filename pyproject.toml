@@ -5,7 +5,7 @@ description = "Declarative file format transformer — config-driven column mapp
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
-authors = [{ name = "Ruaridh", email = "ruaridh@example.com" }]
+authors = [{ name = "Ruaridh Williamson", email = "ruaridh.williamson@gmail.com" }]
 keywords = ["etl", "transform", "polars", "csv", "schema"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -16,26 +16,36 @@ classifiers = [
 ]
 
 dependencies = [
-    "polars>=1.0",
-    "pydantic>=2.0",
-    "pyyaml>=6.0",
-    "click>=8.0",
-    "fastexcel>=0.12",
+    "polars>=1.0,<2",
+    "pydantic>=2.12,<3",
+    "pyyaml>=6.0,<7",
+    "click>=8.3,<9",
+    "fastexcel>=0.19,<1",
 ]
 
 [project.optional-dependencies]
+docs = [
+    "sphinx>=9.1",
+    "furo>=2025.12.19",
+    "myst-parser>=5.0",
+    "sphinx-copybutton>=0.5",
+    "sphinx-design>=0.7",
+    "sphinx-autodoc-typehints>=3.9",
+]
 llm = [
-    "langchain-core>=0.3",
-    "langchain-anthropic>=0.3",
+    "langchain-core>=1.2,<2",
+    "langchain-anthropic>=1.4,<2",
+    "langchain-azure-ai>=1.2,<2",
+    "python-dotenv>=1.2,<2",
 ]
 dev = [
-    "pytest>=8.0",
-    "pytest-cov>=5.0",
-    "hypothesis>=6.0",
-    "pre-commit>=3.0",
-    "ruff>=0.8",
-    "black>=24.0",
-    "isort>=5.0",
+    "pytest>=9.0",
+    "pytest-cov>=7.1",
+    "hypothesis>=6.151",
+    "pre-commit>=4.5",
+    "ruff>=0.15",
+    "black>=26.3",
+    "isort>=8.0",
 ]
 
 [project.scripts]
@@ -54,23 +64,36 @@ addopts = "--cov=schemashift --cov-report=term-missing"
 
 [tool.ruff]
 src = ["src"]
-line-length = 100
+line-length = 120
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+per-file-ignores = { "tests/fixtures/**" = ["E501", "UP017", "SIM108"] }
 
 [tool.black]
-line-length = 100
+line-length = 120
 
 [tool.isort]
 profile = "black"
-line_length = 100
+line_length = 120
 known_first_party = ["schemashift"]
 
 [tool.coverage.run]
 source = ["schemashift"]
 
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
 [dependency-groups]
 dev = [
-    "openpyxl>=3.1.5",
+    "openpyxl>=3.1",
 ]

@@ -9,3 +9,6 @@ dist/
 .venv/
 
 .hypothesis/
+.env
+.idea/
+docs/_build/
