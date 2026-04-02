@@ -162,16 +162,12 @@ class TestValidateEager:
         test_schema.validate_eager(matching_df)  # should not raise
 
     def test_null_in_required_column_raises(self, test_schema, matching_df):
-        df_with_null = matching_df.with_columns(
-            pl.Series("id", [1, None, 3], dtype=pl.Int64)
-        )
+        df_with_null = matching_df.with_columns(pl.Series("id", [1, None, 3], dtype=pl.Int64))
         with pytest.raises(SchemaValidationError, match="Required column 'id'"):
             test_schema.validate_eager(df_with_null)
 
     def test_null_in_optional_column_passes(self, test_schema, matching_df):
-        df_with_null = matching_df.with_columns(
-            pl.Series("amount", [1.0, None, 3.0], dtype=pl.Float64)
-        )
+        df_with_null = matching_df.with_columns(pl.Series("amount", [1.0, None, 3.0], dtype=pl.Float64))
         test_schema.validate_eager(df_with_null)  # should not raise
 
     def test_missing_column_raises(self, test_schema, matching_df):

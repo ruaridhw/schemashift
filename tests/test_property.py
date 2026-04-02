@@ -194,9 +194,7 @@ class TestDslParserNeverCrashes:
         except DSLSyntaxError:
             pass  # Expected for invalid input
         except Exception as exc:
-            pytest.fail(
-                f"Parser raised unexpected {type(exc).__name__}: {exc!r} for input {text!r}"
-            )
+            pytest.fail(f"Parser raised unexpected {type(exc).__name__}: {exc!r} for input {text!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -314,9 +312,7 @@ class TestTargetSchemaYamlRoundtrip:
     def test_schema_required_columns_match(self, col_names: list[str]) -> None:
         schema_data = {
             "name": "req_schema",
-            "columns": [
-                {"name": n, "type": "str", "required": True} for n in col_names
-            ],
+            "columns": [{"name": n, "type": "str", "required": True} for n in col_names],
         }
 
         tmpdir = tempfile.mkdtemp()

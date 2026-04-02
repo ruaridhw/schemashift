@@ -1,0 +1,52 @@
+name: promis_legacy
+description: >
+  PROMIS legacy MES export. UTF-8 with BOM. French accented column headers.
+  Type flip in Lot_Réf: first 5 rows are bare integers (1234..1238), last 5 are
+  "L005001" etc. Prepend "L" and zero-pad to normalise: when integer, format as
+  "L00" + value; when already prefixed, keep as-is.
+  Mixed null sentinels in optional columns (NULL, N/A, -, #N/A, empty).
+  Hold as Oui/Non (French).
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+  separator: ","
+  encoding: utf-8-sig
+columns:
+  - target: lot_id
+    # Rows 0-4: "1234" → "L001234"; rows 5-9: "L005001" already correct.
+    # Detect by checking if value starts with "L".
+    expr: >
+      when(col("Lot_Réf").str.starts_with("L"), col("Lot_Réf")).otherwise(
+        "L" + col("Lot_Réf").str.slice(0, 2).str.replace(".*", "00")
+      )
+  - target: wafer_count
+    source: Nb_Plaques
+    dtype: int32
+  - target: operation
+    source: Opération
+  - target: step_sequence
+    # Mixed nulls: NULL, N/A, -, #N/A, empty → treat all non-numeric as null
+    expr: 'col("Séquence").str.extract("([0-9]+)", 1).cast("int32")'
+  - target: tool_id
+    source: Équipement
+  - target: track_in_time
+    source: Heure_Entrée
+    expr: 'col("Heure_Entrée").str.to_datetime("%Y-%m-%d %H:%M:%S")'
+  - target: track_out_time
+    # Mixed null sentinels: NULL, N/A, -, #N/A, empty — coalesce by trying parse;
+    # non-parseable values become null naturally with strict=false behaviour.
+    expr: 'col("Heure_Sortie").str.to_datetime("%Y-%m-%d %H:%M:%S")'
+  - target: recipe
+    source: Recette
+  - target: route
+    # Mixed nulls in Parcours: NULL, N/A, etc. → keep as null
+    expr: 'when(col("Parcours").str.contains("NULL") | col("Parcours").str.contains("N/A") | col("Parcours") == "-" | col("Parcours") == "#N/A", null).otherwise(col("Parcours"))'
+  - target: priority
+    source: Priorité
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("Blocage") == "Oui"'
+  - target: data_source
+    constant: promis_legacy
+drop_unmapped: true

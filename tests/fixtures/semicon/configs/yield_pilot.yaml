@@ -1,0 +1,42 @@
+name: yield_pilot
+description: >
+  Yield Pilot Parquet export. lot_id stored as Int64 (no "L" prefix, no zero-padding):
+  1234, 5001, etc. Reconstruct as "L001234", "L005001" etc.
+  wfr_count is Float64 (even though logically integer) — cast to int32.
+  track_out for L005005 is sentinel datetime(9999-12-31) — must be nulled.
+  hold as Int8 (0/1). priority as Int8.
+  4 distractor columns: yield_pct, defect_count, review_status, inspector.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+columns:
+  - target: lot_id
+    # Int64 → "L" + zero-padded 6-digit string, e.g. 1234 → "L001234"
+    expr: '"L" + col("lot_id").cast("str").str.slice(0, 6)'
+  - target: wafer_count
+    expr: 'col("wfr_count").cast("int32")'
+  - target: operation
+    source: oper
+  - target: step_sequence
+    source: step_seq
+    dtype: int32
+  - target: tool_id
+    source: tool
+  - target: track_in_time
+    source: track_in
+  - target: track_out_time
+    # Sentinel 9999-12-31 → null
+    expr: 'when(col("track_out").dt.year() == 9999, null).otherwise(col("track_out"))'
+  - target: recipe
+    source: recipe
+  - target: route
+    source: route
+  - target: priority
+    source: priority
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("hold") == 1'
+  - target: data_source
+    constant: yield_pilot
+drop_unmapped: true

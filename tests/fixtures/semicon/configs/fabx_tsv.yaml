@@ -1,0 +1,45 @@
+name: fabx_tsv
+description: >
+  FabX custom WIP export. Tab-delimited. Timestamps as Unix epoch seconds (int).
+  Sentinel value 0 for missing track_out (L005005 still in process).
+  hold as 0/1 integer.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+  separator: "\t"
+  encoding: utf-8
+columns:
+  - target: lot_id
+    source: lot
+  - target: wafer_count
+    source: wfrs
+    dtype: int32
+  - target: operation
+    source: op_code
+  - target: step_sequence
+    source: seq
+    dtype: int32
+  - target: tool_id
+    source: tool
+  - target: track_in_time
+    # Epoch seconds → Polars datetime: multiply by 1_000_000 to get microseconds,
+    # then cast to datetime.
+    expr: 'col("t_in").cast("int64") * 1000000'
+    dtype: datetime
+  - target: track_out_time
+    # Sentinel 0 → null. Multiply non-zero epoch by 1_000_000 for microseconds.
+    expr: 'when(col("t_out") == 0, null).otherwise(col("t_out").cast("int64") * 1000000)'
+    dtype: datetime
+  - target: recipe
+    source: recipe
+  - target: route
+    source: route
+  - target: priority
+    source: prio
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("hold") == 1'
+  - target: data_source
+    constant: fabx
+drop_unmapped: true

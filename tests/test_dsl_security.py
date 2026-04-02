@@ -128,11 +128,7 @@ class TestOutputType:
         assert isinstance(result, pl.Expr)
 
     def test_complex_expression_produces_expr(self) -> None:
-        expr = (
-            'when(col("Score") >= 90, "A")'
-            '.when(col("Score") >= 80, "B")'
-            '.otherwise("C")'
-        )
+        expr = 'when(col("Score") >= 90, "A").when(col("Score") >= 80, "B").otherwise("C")'
         result = parse_and_compile(expr)
         assert isinstance(result, pl.Expr)
 
@@ -180,7 +176,7 @@ class TestRobustness:
 
     def test_unicode_identifier_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("col(\"α\"β\")")
+            parse_dsl('col("α"β")')
 
     def test_random_numbers_only_expression_parses(self) -> None:
         """A plain number literal is valid DSL."""
@@ -189,7 +185,7 @@ class TestRobustness:
 
     def test_deeply_nested_parens_parse(self) -> None:
         """Deeply nested parentheses should parse correctly."""
-        expression = "(" * 50 + '1' + ")" * 50
+        expression = "(" * 50 + "1" + ")" * 50
         result = parse_and_compile(expression)
         assert isinstance(result, pl.Expr)
 
@@ -224,10 +220,21 @@ class TestCastValidation:
 
     def test_valid_cast_types_accepted(self) -> None:
         valid_types = [
-            "str", "utf8", "float32", "float64",
-            "int8", "int16", "int32", "int64",
-            "uint8", "uint16", "uint32", "uint64",
-            "bool", "date", "datetime",
+            "str",
+            "utf8",
+            "float32",
+            "float64",
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
+            "bool",
+            "date",
+            "datetime",
         ]
         for t in valid_types:
             result = parse_and_compile(f'col("x").cast("{t}")')

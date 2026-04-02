@@ -309,14 +309,18 @@ class TestAutoTransform:
 
     def test_auto_transform_raises_when_ambiguous(self) -> None:
         reg = DictRegistry()
-        reg.register(FormatConfig(
-            name="cfg1",
-            columns=[ColumnMapping(target="out", source="id")],
-        ))
-        reg.register(FormatConfig(
-            name="cfg2",
-            columns=[ColumnMapping(target="out", source="id")],
-        ))
+        reg.register(
+            FormatConfig(
+                name="cfg1",
+                columns=[ColumnMapping(target="out", source="id")],
+            )
+        )
+        reg.register(
+            FormatConfig(
+                name="cfg2",
+                columns=[ColumnMapping(target="out", source="id")],
+            )
+        )
 
         with pytest.raises(AmbiguousFormatError):
             auto_transform(SAMPLE_CSV, reg)

@@ -1,0 +1,43 @@
+name: infinityqs_spc
+description: >
+  InfinityQS SPC export (XLSX). First 3 rows are title/metadata/blank — skip them.
+  6 distractor columns: Cp, Cpk, Yield_Pct, Defect_Count, Operator, Shift.
+  L005004 wafer count stored as float (1.0 / scientific notation).
+  L005005 track_out as sentinel date 9999-12-31 — must be nulled out.
+  Last row is a TOTAL summary — must be filtered before transformation.
+  Hold as Y/N strings.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 3
+  sheet_name: LotMovement
+columns:
+  - target: lot_id
+    source: Lot
+  - target: wafer_count
+    # Stored as float (1.0 for L005004); cast to int32
+    expr: 'col("Wafers").cast("int32")'
+  - target: operation
+    source: Op
+  - target: step_sequence
+    source: Step
+    dtype: int32
+  - target: tool_id
+    source: Tool
+  - target: track_in_time
+    source: Track_In
+  - target: track_out_time
+    # Sentinel 9999-12-31 → null
+    expr: 'when(col("Track_Out").dt.year() == 9999, null).otherwise(col("Track_Out"))'
+  - target: recipe
+    source: Recipe
+  - target: route
+    source: Route
+  - target: priority
+    source: Priority
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("Hold") == "Y"'
+  - target: data_source
+    constant: infinityqs_spc
+drop_unmapped: true

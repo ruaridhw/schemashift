@@ -1,0 +1,47 @@
+name: factorytalk
+description: >
+  FactoryTalk MES JSON export. Date and time are split across two fields:
+  track_in_date + track_in_time (with tz offset, e.g. "08:12:33+00:00" or "+09:00" for JST).
+  Combine with string concatenation then parse as ISO 8601.
+  Priority as text: Hot=1, Normal=2, Low=3, Monitoring=4.
+  Hold (on_hold) as mixed JSON types: true/false, "Yes"/"No", 1/0.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+columns:
+  - target: lot_id
+    source: lot_number
+  - target: wafer_count
+    source: wafer_qty
+    dtype: int32
+  - target: operation
+    source: process_step
+  - target: step_sequence
+    source: step_num
+    dtype: int32
+  - target: tool_id
+    source: equipment
+  - target: track_in_time
+    # Concatenate date + "T" + time (with tz offset) → ISO 8601 datetime string
+    expr: '(col("track_in_date") + "T" + col("track_in_time")).str.to_datetime("%Y-%m-%dT%H:%M:%S%z")'
+  - target: track_out_time
+    # null when track_out_date is null (lot still in process)
+    expr: 'when(col("track_out_date").is_null(), null).otherwise((col("track_out_date") + "T" + col("track_out_time")).str.to_datetime("%Y-%m-%dT%H:%M:%S%z"))'
+  - target: recipe
+    source: recipe_id
+  - target: route
+    source: production_route
+  - target: priority
+    expr: >
+      when(col("lot_priority") == "Hot", 1)
+      .when(col("lot_priority") == "Normal", 2)
+      .when(col("lot_priority") == "Low", 3)
+      .otherwise(4)
+    dtype: int32
+  - target: hold_flag
+    # Mixed types: true, false, "Yes", "No", 1, 0 — cast to string, check truthy values
+    expr: 'col("on_hold").cast("str") == "true" | col("on_hold").cast("str") == "Yes" | col("on_hold").cast("str") == "1"'
+  - target: data_source
+    constant: factorytalk
+drop_unmapped: true

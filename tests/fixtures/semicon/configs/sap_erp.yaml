@@ -1,0 +1,43 @@
+name: sap_erp
+description: >
+  SAP ERP lot movement export. Semicolon-delimited with German column names.
+  Wafer count as European decimal float with units: "25,0 pcs" — requires
+  extracting digits before comma and casting. Step sequence has " steps" suffix.
+  Lot IDs are zero-padded 6-digit integers without the "L" prefix.
+  Timestamps in DD.MM.YYYY HH:MM:SS format. Hold as Ja/Nein.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+  separator: ";"
+  encoding: utf-8
+columns:
+  - target: lot_id
+    # Prepend "L" and strip leading zeros, e.g. "001234" → "L001234"
+    expr: '"L" + col("LOS_NR").str.replace("^0+", "")'
+  - target: wafer_count
+    # "25,0 pcs" → extract integer part before comma → cast to int32
+    expr: 'col("WAFER_ANZ").str.extract("([0-9]+),", 1).cast("int32")'
+  - target: operation
+    source: OPERATION
+  - target: step_sequence
+    # "450 steps" → extract digits → cast to int32
+    expr: 'col("SCHRITT_NR").str.extract("([0-9]+)", 1).cast("int32")'
+  - target: tool_id
+    source: WERKZEUG_ID
+  - target: track_in_time
+    expr: 'col("EINGANG_ZEIT").str.to_datetime("%d.%m.%Y %H:%M:%S")'
+  - target: track_out_time
+    expr: 'col("AUSGANG_ZEIT").str.to_datetime("%d.%m.%Y %H:%M:%S")'
+  - target: recipe
+    source: REZEPT
+  - target: route
+    source: ANLAGE_ROUTE
+  - target: priority
+    source: PRIORITAET
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("HOLD_STATUS") == "Ja"'
+  - target: data_source
+    constant: sap_erp
+drop_unmapped: true

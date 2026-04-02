@@ -1,0 +1,49 @@
+name: amhs_carrier
+description: >
+  AMHS carrier tracking CSV. Two columns both named "Date": Polars auto-renames
+  the second occurrence. The renamed column for track_out is "Date_duplicated_0"
+  (Polars behaviour when reading CSVs with duplicate headers).
+  NOTE: the exact auto-rename suffix depends on Polars version — verify with:
+    pl.read_csv("amhs_carrier.csv").columns
+  "Count (pcs)" contains wafer counts despite the ambiguous name (verify from values).
+  Whitespace-only cells in seq and rte columns — treat as null.
+  Hold as free text: "Quality Hold", "Eng Hold", "Engr", empty/whitespace = no hold.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+  separator: ","
+  encoding: utf-8
+columns:
+  - target: lot_id
+    source: id
+  - target: wafer_count
+    # "Count (pcs)" is wafer count for this system (despite ambiguous name)
+    source: Count (pcs)
+    dtype: int32
+  - target: operation
+    source: op
+  - target: step_sequence
+    # Whitespace-only cells → strip → null if empty
+    expr: 'col("seq").str.strip().str.extract("([0-9]+)", 1).cast("int32")'
+  - target: tool_id
+    source: eq
+  - target: track_in_time
+    expr: 'col("Date").str.to_datetime("%Y-%m-%d %H:%M:%S")'
+  - target: track_out_time
+    # Second "Date" column auto-renamed by Polars to "Date_duplicated_0"
+    expr: 'col("Date_duplicated_0").str.to_datetime("%Y-%m-%d %H:%M:%S")'
+  - target: recipe
+    source: rcp
+  - target: route
+    # Whitespace-only cells → strip → null if empty
+    expr: 'when(col("rte").str.strip() == "", null).otherwise(col("rte").str.strip())'
+  - target: priority
+    source: pri
+    dtype: int32
+  - target: hold_flag
+    # Free text: non-empty and non-whitespace = on hold
+    expr: 'col("hold_reason").str.strip() != ""'
+  - target: data_source
+    constant: amhs_carrier
+drop_unmapped: true

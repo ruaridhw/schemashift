@@ -207,11 +207,7 @@ class TestExcelFromPRD:
                 ColumnMapping(target="route", source="Route Name"),
                 ColumnMapping(
                     target="priority",
-                    expr=(
-                        'when(col("Pri") == "HOT", 1)'
-                        '.when(col("Pri") == "NORMAL", 3)'
-                        ".otherwise(5)"
-                    ),
+                    expr=('when(col("Pri") == "HOT", 1).when(col("Pri") == "NORMAL", 3).otherwise(5)'),
                 ),
                 ColumnMapping(target="hold_flag", expr='col("Status") == "Hold"'),
                 ColumnMapping(target="data_source", constant="smartfactory"),

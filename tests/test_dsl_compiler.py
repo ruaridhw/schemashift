@@ -65,25 +65,17 @@ class TestArithmetic:
 
     def test_complex_multi_column(self) -> None:
         df = pl.DataFrame({"Price": [100, 200, 300], "Qty": [1, 2, 3]})
-        result = (
-            df.select(parse_and_compile('col("Price") * col("Qty") / 1000').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("Price") * col("Qty") / 1000').alias("out"))["out"].to_list()
         assert result == pytest.approx([0.1, 0.4, 0.9])
 
     def test_operator_precedence_mul_before_add(self) -> None:
         df = pl.DataFrame({"X": [2, 4, 6], "Y": [3, 3, 3]})
-        result = (
-            df.select(parse_and_compile('col("X") + col("Y") * 2').alias("out"))["out"].to_list()
-        )
+        result = df.select(parse_and_compile('col("X") + col("Y") * 2').alias("out"))["out"].to_list()
         assert result == [8, 10, 12]
 
     def test_parentheses_override_precedence(self) -> None:
         df = pl.DataFrame({"X": [2, 4, 6]})
-        result = (
-            df.select(parse_and_compile('(col("X") + 1) * 2').alias("out"))["out"].to_list()
-        )
+        result = df.select(parse_and_compile('(col("X") + 1) * 2').alias("out"))["out"].to_list()
         assert result == [6, 10, 14]
 
 
@@ -100,9 +92,7 @@ class TestUnaryMinus:
 
     def test_negate_expression(self) -> None:
         df = pl.DataFrame({"X": [1, 2, 3]})
-        result = (
-            df.select(parse_and_compile('-(col("X") + 1)').alias("out"))["out"].to_list()
-        )
+        result = df.select(parse_and_compile('-(col("X") + 1)').alias("out"))["out"].to_list()
         assert result == [-2, -3, -4]
 
 
@@ -178,11 +168,7 @@ class TestNullHandling:
 
     def test_fill_null_with_string(self) -> None:
         df = pl.DataFrame({"X": ["a", None, "c"]})
-        result = (
-            df.select(parse_and_compile('col("X").fill_null("unknown")').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").fill_null("unknown")').alias("out"))["out"].to_list()
         assert result == ["a", "unknown", "c"]
 
     def test_is_null(self) -> None:
@@ -243,20 +229,12 @@ class TestStringMethods:
 
     def test_str_to_lowercase(self) -> None:
         df = pl.DataFrame({"X": ["HELLO"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.to_lowercase()').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.to_lowercase()').alias("out"))["out"].to_list()
         assert result == ["hello"]
 
     def test_str_to_uppercase(self) -> None:
         df = pl.DataFrame({"X": ["hello"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.to_uppercase()').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.to_uppercase()').alias("out"))["out"].to_list()
         assert result == ["HELLO"]
 
     def test_str_strip(self) -> None:
@@ -266,59 +244,37 @@ class TestStringMethods:
 
     def test_str_replace(self) -> None:
         df = pl.DataFrame({"X": ["hello world", "world"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.replace("world", "earth")').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.replace("world", "earth")').alias("out"))["out"].to_list()
         assert result == ["hello earth", "earth"]
 
     def test_str_contains(self) -> None:
         df = pl.DataFrame({"X": ["foobar", "baz", "foo"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.contains("foo")').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.contains("foo")').alias("out"))["out"].to_list()
         assert result == [True, False, True]
 
     def test_str_starts_with(self) -> None:
         df = pl.DataFrame({"X": ["hello", "world", "help"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.starts_with("hel")').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.starts_with("hel")').alias("out"))["out"].to_list()
         assert result == [True, False, True]
 
     def test_str_ends_with(self) -> None:
         df = pl.DataFrame({"X": ["hello", "world", "jello"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.ends_with("llo")').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.ends_with("llo")').alias("out"))["out"].to_list()
         assert result == [True, False, True]
 
     def test_str_slice(self) -> None:
         df = pl.DataFrame({"X": ["hello", "world"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.slice(1, 3)').alias("out"))["out"].to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.slice(1, 3)').alias("out"))["out"].to_list()
         assert result == ["ell", "orl"]
 
     def test_str_lengths(self) -> None:
         df = pl.DataFrame({"X": ["hi", "hello", "hey"]})
-        result = (
-            df.select(parse_and_compile('col("X").str.lengths()').alias("out"))["out"].to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.lengths()').alias("out"))["out"].to_list()
         assert result == [2, 5, 3]
 
     def test_str_to_datetime(self) -> None:
         df = pl.DataFrame({"X": ["2024-01-15", "2024-06-30"]})
-        result = df.select(
-            parse_and_compile('col("X").str.to_datetime("%Y-%m-%d")').alias("out")
-        )
+        result = df.select(parse_and_compile('col("X").str.to_datetime("%Y-%m-%d")').alias("out"))
         assert result["out"].dtype == pl.Datetime
         assert result["out"][0].year == 2024
         assert result["out"][0].month == 1
@@ -327,23 +283,12 @@ class TestStringMethods:
     def test_str_extract(self) -> None:
         df = pl.DataFrame({"X": ["abc123def", "xyz456ghi"]})
         # Use escaped backslash inside the DSL string literal.
-        result = (
-            df.select(parse_and_compile('col("X").str.extract("(\\\\d+)", 1)').alias("out"))
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.extract("(\\\\d+)", 1)').alias("out"))["out"].to_list()
         assert result == ["123", "456"]
-
 
     def test_str_strip_then_lower_chained(self) -> None:
         df = pl.DataFrame({"X": ["  HELLO  ", " WORLD "]})
-        result = (
-            df.select(
-                parse_and_compile('col("X").str.strip().str.lower()').alias("out")
-            )
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X").str.strip().str.lower()').alias("out"))["out"].to_list()
         assert result == ["hello", "world"]
 
 
@@ -372,15 +317,11 @@ class TestDatetimeMethods:
         assert result["out"].to_list() == [15, 7]
 
     def test_dt_strftime(self, date_df: pl.DataFrame) -> None:
-        result = date_df.select(
-            parse_and_compile('col("ts").dt.strftime("%Y")').alias("out")
-        )
+        result = date_df.select(parse_and_compile('col("ts").dt.strftime("%Y")').alias("out"))
         assert result["out"].to_list() == ["2024", "2023"]
 
     def test_dt_strftime_full_format(self, date_df: pl.DataFrame) -> None:
-        result = date_df.select(
-            parse_and_compile('col("ts").dt.strftime("%d/%m/%Y")').alias("out")
-        )
+        result = date_df.select(parse_and_compile('col("ts").dt.strftime("%d/%m/%Y")').alias("out"))
         assert result["out"].to_list() == ["15/03/2024", "07/11/2023"]
 
 
@@ -392,65 +333,35 @@ class TestDatetimeMethods:
 class TestWhenOtherwise:
     def test_simple_when_otherwise(self) -> None:
         df = pl.DataFrame({"X": ["a", "b", "c"]})
-        result = (
-            df.select(
-                parse_and_compile('when(col("X") == "a", 1).otherwise(0)').alias("out")
-            )
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('when(col("X") == "a", 1).otherwise(0)').alias("out"))["out"].to_list()
         assert result == [1, 0, 0]
 
     def test_chained_when_otherwise(self) -> None:
         df = pl.DataFrame({"X": ["a", "b", "c"]})
-        result = (
-            df.select(
-                parse_and_compile(
-                    'when(col("X") == "a", 1).when(col("X") == "b", 2).otherwise(3)'
-                ).alias("out")
-            )
-            ["out"]
-            .to_list()
-        )
+        result = df.select(
+            parse_and_compile('when(col("X") == "a", 1).when(col("X") == "b", 2).otherwise(3)').alias("out")
+        )["out"].to_list()
         assert result == [1, 2, 3]
 
     def test_when_with_numeric_comparison(self) -> None:
         df = pl.DataFrame({"Score": [90, 70, 50]})
-        result = (
-            df.select(
-                parse_and_compile(
-                    'when(col("Score") >= 80, "pass").otherwise("fail")'
-                ).alias("out")
-            )
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('when(col("Score") >= 80, "pass").otherwise("fail")').alias("out"))[
+            "out"
+        ].to_list()
         assert result == ["pass", "fail", "fail"]
 
     def test_when_value_is_expression(self) -> None:
         df = pl.DataFrame({"X": [2, -1, 4]})
-        result = (
-            df.select(
-                parse_and_compile(
-                    'when(col("X") > 0, col("X") * 10).otherwise(0)'
-                ).alias("out")
-            )
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('when(col("X") > 0, col("X") * 10).otherwise(0)').alias("out"))[
+            "out"
+        ].to_list()
         assert result == [20, 0, 40]
 
     def test_when_otherwise_with_null(self) -> None:
         df = pl.DataFrame({"X": [1, None, 3]})
-        result = (
-            df.select(
-                parse_and_compile(
-                    'when(col("X").is_null(), -1).otherwise(col("X"))'
-                ).alias("out")
-            )
-            ["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('when(col("X").is_null(), -1).otherwise(col("X"))').alias("out"))[
+            "out"
+        ].to_list()
         assert result == [1, -1, 3]
 
 
@@ -491,22 +402,12 @@ class TestLiterals:
 class TestLogicalCompiled:
     def test_logical_and(self) -> None:
         df = pl.DataFrame({"X": [1, 5, 10], "Y": [8, 3, 7]})
-        result = (
-            df.select(
-                parse_and_compile('col("X") > 3 & col("Y") > 5').alias("out")
-            )["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X") > 3 & col("Y") > 5').alias("out"))["out"].to_list()
         assert result == [False, False, True]
 
     def test_logical_or(self) -> None:
         df = pl.DataFrame({"X": [1, 5, 10]})
-        result = (
-            df.select(
-                parse_and_compile('col("X") == 1 | col("X") == 10').alias("out")
-            )["out"]
-            .to_list()
-        )
+        result = df.select(parse_and_compile('col("X") == 1 | col("X") == 10').alias("out"))["out"].to_list()
         assert result == [True, False, True]
 
 
@@ -535,9 +436,7 @@ class TestDatetimeMethodsExtended:
         assert result["out"].to_list() == [52, 1]
 
     def test_dt_timestamp(self, datetime_df: pl.DataFrame) -> None:
-        result = datetime_df.select(
-            parse_and_compile('col("ts").dt.timestamp()').alias("out")
-        )
+        result = datetime_df.select(parse_and_compile('col("ts").dt.timestamp()').alias("out"))
         ts_list = result["out"].to_list()
         assert len(ts_list) == 2
         # Timestamps should be positive integer milliseconds since epoch.
@@ -579,14 +478,12 @@ class TestCoalesce:
 
     def test_str_replace_regex_substitutes_pattern(self) -> None:
         df = pl.DataFrame({"name": ["abc123", "def456"]})
-        result = df.select(
-            parse_and_compile(r'col("name").str.replace_regex("\\d+", "NUM")').alias("out")
-        )["out"].to_list()
+        result = df.select(parse_and_compile(r'col("name").str.replace_regex("\\d+", "NUM")').alias("out"))[
+            "out"
+        ].to_list()
         assert result == ["abcNUM", "defNUM"]
 
     def test_str_replace_literal_still_works(self) -> None:
         df = pl.DataFrame({"name": ["a.b", "c.d"]})
-        result = df.select(
-            parse_and_compile('col("name").str.replace(".", "W")').alias("out")
-        )["out"].to_list()
+        result = df.select(parse_and_compile('col("name").str.replace(".", "W")').alias("out"))["out"].to_list()
         assert result == ["aWb", "cWd"]
