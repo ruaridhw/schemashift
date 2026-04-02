@@ -45,7 +45,6 @@ dev = [
     "pre-commit>=4.5",
     "ruff>=0.15",
     "black>=26.3",
-    "isort>=8.0",
 ]
 
 [project.scripts]
@@ -73,11 +72,6 @@ per-file-ignores = { "tests/fixtures/**" = ["E501", "UP017", "SIM108"] }
 
 [tool.black]
 line-length = 120
-
-[tool.isort]
-profile = "black"
-line_length = 120
-known_first_party = ["schemashift"]
 
 [tool.coverage.run]
 source = ["schemashift"]
