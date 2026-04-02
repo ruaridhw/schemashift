@@ -1,9 +1,11 @@
 """Tests for schemashift.llm — LLM config generation engine."""
 
-import json
+import logging
 
 import polars as pl
 import pytest
+from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+from langchain_core.messages import AIMessage
 
 from schemashift.errors import LLMGenerationError
 from schemashift.llm import _extract_json, build_prompt, generate_config
@@ -11,40 +13,16 @@ from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.target_schema import TargetColumn, TargetSchema
 
 
-class MockLLM:
-    def __init__(self, response: str) -> None:
-        self._response = response
+class FakeToolCallingModel(FakeMessagesListChatModel):
+    """Minimal fake LLM that supports tool-calling for use with create_agent."""
 
-    def invoke(self, prompt: str) -> object:
-        class Msg:
-            pass
-
-        msg = Msg()
-        msg.content = self._response
-        return msg
+    def bind_tools(self, tools, **kwargs):
+        return self
 
 
-class SequenceLLM:
-    """Returns successive responses from a list, then repeats the last."""
-
-    def __init__(self, responses: list[str]) -> None:
-        self._responses = responses
-        self._calls: list[str] = []
-
-    def invoke(self, prompt: str) -> object:
-        self._calls.append(prompt)
-        idx = min(len(self._calls) - 1, len(self._responses) - 1)
-
-        class Msg:
-            pass
-
-        msg = Msg()
-        msg.content = self._responses[idx]
-        return msg
-
-    @property
-    def call_count(self) -> int:
-        return len(self._calls)
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
 
 
 class TestExtractJson:
@@ -112,6 +90,11 @@ class TestBuildPrompt:
         assert "test" in prompt
         assert "same" in prompt
 
+    def test_instructs_tool_use(self, schema):
+        df = pl.DataFrame({"x": [1]})
+        prompt = build_prompt(df, schema, ["x"])
+        assert "submit_format_config" in prompt
+
 
 class TestGenerateConfig:
     @pytest.fixture
@@ -130,87 +113,82 @@ class TestGenerateConfig:
             ],
         )
 
-    def _valid_response(self, name="fmt") -> str:
-        return json.dumps(
-            {
-                "name": name,
-                "columns": [
-                    {"target": "student", "source": "Name"},
-                    {"target": "grade", "source": "Score"},
-                ],
-            }
-        )
+    def _valid_args(self, name: str = "fmt") -> dict:
+        return {
+            "name": name,
+            "columns": [
+                {"target": "student", "source": "Name"},
+                {"target": "grade", "source": "Score"},
+            ],
+        }
+
+    def _bad_dsl_args(self) -> dict:
+        return {
+            "name": "f",
+            "columns": [
+                {"target": "student", "expr": "INVALID!!!"},
+                {"target": "grade", "source": "Score"},
+            ],
+        }
+
+    def _llm(self, *tool_call_args: dict | None) -> FakeToolCallingModel:
+        """Build a fake LLM that makes tool calls in sequence then finishes."""
+        responses: list[AIMessage] = []
+        for i, args in enumerate(tool_call_args):
+            if args is not None:
+                responses.append(
+                    AIMessage(
+                        content="",
+                        tool_calls=[{"id": f"tc{i}", "name": "submit_format_config", "args": args}],
+                    )
+                )
+        responses.append(AIMessage(content="Done."))
+        return FakeToolCallingModel(responses=responses)
 
     def test_successful_generation(self, csv_file, schema):
-        config = generate_config(csv_file, schema, llm=MockLLM(self._valid_response()))
+        config = generate_config(csv_file, schema, llm=self._llm(self._valid_args()))
         assert config.name == "fmt"
         assert len(config.columns) == 2
 
     def test_uses_path_stem_as_name(self, csv_file, schema):
-        response = json.dumps(
-            {
-                "columns": [
-                    {"target": "student", "source": "Name"},
-                    {"target": "grade", "source": "Score"},
-                ]
-            }
-        )
-        config = generate_config(csv_file, schema, llm=MockLLM(response))
-        assert config.name == "data"  # stem of data.csv
-
-    def test_retries_on_bad_json(self, csv_file, schema):
-        llm = SequenceLLM(["not json", self._valid_response()])
-        config = generate_config(csv_file, schema, llm=llm, max_retries=2)
-        assert llm.call_count == 2
+        args = {
+            "columns": [
+                {"target": "student", "source": "Name"},
+                {"target": "grade", "source": "Score"},
+            ]
+        }
+        config = generate_config(csv_file, schema, llm=self._llm(args))
+        assert config.name == "data"
 
     def test_retries_on_bad_dsl(self, csv_file, schema):
-        bad_dsl = json.dumps(
-            {
-                "name": "f",
-                "columns": [
-                    {"target": "student", "expr": "INVALID!!!"},
-                    {"target": "grade", "source": "Score"},
-                ],
-            }
+        config = generate_config(
+            csv_file, schema, llm=self._llm(self._bad_dsl_args(), self._valid_args()), max_retries=2
         )
-        llm = SequenceLLM([bad_dsl, self._valid_response()])
-        config = generate_config(csv_file, schema, llm=llm, max_retries=2)
-        assert llm.call_count == 2
+        assert config.name == "fmt"
 
-    def test_raises_after_exhausted_retries(self, csv_file, schema):
+    def test_raises_when_no_valid_config_submitted(self, csv_file, schema):
+        llm = FakeToolCallingModel(responses=[AIMessage(content="I cannot help.")])
         with pytest.raises(LLMGenerationError):
-            generate_config(csv_file, schema, llm=MockLLM("bad"), max_retries=1)
+            generate_config(csv_file, schema, llm=llm, max_retries=1)
 
     def test_error_includes_attempts(self, csv_file, schema):
         with pytest.raises(LLMGenerationError) as exc_info:
-            generate_config(csv_file, schema, llm=MockLLM("bad"), max_retries=1)
+            generate_config(
+                csv_file,
+                schema,
+                llm=self._llm(self._bad_dsl_args(), self._bad_dsl_args()),
+                max_retries=1,
+            )
         err = exc_info.value
         assert len(err.attempts) == 2
-        assert all("prompt" in a and "response" in a and "error" in a for a in err.attempts)
+        assert all("response" in a and "error" in a for a in err.attempts)
 
-    def test_langchain_style_llm(self, csv_file, schema):
-        class FakeLLM:
-            def invoke(self, prompt):
-                class Msg:
-                    content = json.dumps(
-                        {
-                            "name": "lc",
-                            "columns": [
-                                {"target": "student", "source": "Name"},
-                                {"target": "grade", "source": "Score"},
-                            ],
-                        }
-                    )
-
-                return Msg()
-
-        config = generate_config(csv_file, schema, llm=FakeLLM())
-        assert config.name == "lc"
-
-    def test_warning_logged_on_retry(self, csv_file, schema, caplog):
-        import logging
-
-        llm = SequenceLLM(["not json", self._valid_response()])
+    def test_warning_logged_on_validation_failure(self, csv_file, schema, caplog):
         with caplog.at_level(logging.WARNING, logger="schemashift.llm"):
-            generate_config(csv_file, schema, llm=llm, max_retries=2)
+            generate_config(
+                csv_file,
+                schema,
+                llm=self._llm(self._bad_dsl_args(), self._valid_args()),
+                max_retries=2,
+            )
         assert any("attempt" in r.message.lower() for r in caplog.records)
