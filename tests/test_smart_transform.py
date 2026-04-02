@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
 import polars as pl
 import pytest
+from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+from langchain_core.messages import AIMessage
 
 from schemashift.errors import FormatDetectionError
 from schemashift.models import ColumnMapping, FormatConfig
@@ -14,54 +14,72 @@ from schemashift.target_schema import TargetColumn, TargetSchema
 from schemashift.transform import smart_transform
 
 
-class MockLLM:
-    def __init__(self, response: str) -> None:
-        self._response = response
+class FakeToolCallingModel(FakeMessagesListChatModel):
+    """Minimal fake LLM that supports tool-calling for use with create_agent."""
 
-    def invoke(self, prompt: str) -> object:
-        class Msg:
-            pass
+    def bind_tools(self, tools, **kwargs):
+        return self
 
-        msg = Msg()
-        msg.content = self._response
-        return msg
+
+def _make_llm(config_args: dict) -> FakeToolCallingModel:
+    """Return a fake LLM that submits *config_args* via submit_format_config then finishes."""
+    return FakeToolCallingModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[{"id": "tc1", "name": "submit_format_config", "args": config_args}],
+            ),
+            AIMessage(content="Done."),
+        ]
+    )
 
 
 @pytest.fixture
 def sample_csv(tmp_path):
     p = tmp_path / "data.csv"
-    pl.DataFrame({
-        "Name": ["Alice", "Bob"],
-        "Score": [90, 85],
-        "Grade": ["A", "B"],
-    }).write_csv(str(p))
+    pl.DataFrame(
+        {
+            "Name": ["Alice", "Bob"],
+            "Score": [90, 85],
+            "Grade": ["A", "B"],
+        }
+    ).write_csv(str(p))
     return str(p)
 
 
 @pytest.fixture
 def schema():
-    return TargetSchema(name="students", columns=[
-        TargetColumn(name="student_name", type="str", required=True, description="Name"),
-        TargetColumn(name="score", type="float64", required=True, description="Score"),
-        TargetColumn(name="grade", type="str", required=True, description="Grade"),
-    ])
+    return TargetSchema(
+        name="students",
+        columns=[
+            TargetColumn(name="student_name", type="str", required=True, description="Name"),
+            TargetColumn(name="score", type="float64", required=True, description="Score"),
+            TargetColumn(name="grade", type="str", required=True, description="Grade"),
+        ],
+    )
 
 
 @pytest.fixture
 def matching_config():
-    return FormatConfig(name="student_format", columns=[
-        ColumnMapping(target="student_name", source="Name"),
-        ColumnMapping(target="score", source="Score", dtype="float64"),
-        ColumnMapping(target="grade", source="Grade"),
-    ])
+    return FormatConfig(
+        name="student_format",
+        columns=[
+            ColumnMapping(target="student_name", source="Name"),
+            ColumnMapping(target="score", source="Score", dtype="float64"),
+            ColumnMapping(target="grade", source="Grade"),
+        ],
+    )
 
 
-def _valid_llm_response() -> str:
-    return json.dumps({"name": "gen", "columns": [
-        {"target": "student_name", "source": "Name"},
-        {"target": "score", "source": "Score", "dtype": "float64"},
-        {"target": "grade", "source": "Grade"},
-    ]})
+def _valid_config() -> dict:
+    return {
+        "name": "gen",
+        "columns": [
+            {"target": "student_name", "source": "Name"},
+            {"target": "score", "source": "Score", "dtype": "float64"},
+            {"target": "grade", "source": "Grade"},
+        ],
+    }
 
 
 class TestRegistryHit:
@@ -83,17 +101,17 @@ class TestRegistryHit:
 class TestLLMGeneration:
     def test_generates_when_no_match(self, sample_csv, schema):
         reg = DictRegistry()
-        lf = smart_transform(
-            sample_csv, registry=reg, target_schema=schema,
-            llm=MockLLM(_valid_llm_response()),
-        )
+        lf = smart_transform(sample_csv, registry=reg, target_schema=schema, llm=_make_llm(_valid_config()))
         assert set(lf.collect().columns) == {"student_name", "score", "grade"}
 
     def test_auto_registers(self, sample_csv, schema):
         reg = DictRegistry()
         smart_transform(
-            sample_csv, registry=reg, target_schema=schema,
-            llm=MockLLM(_valid_llm_response()), auto_register=True,
+            sample_csv,
+            registry=reg,
+            target_schema=schema,
+            llm=_make_llm(_valid_config()),
+            auto_register=True,
         )
         assert reg.get("gen") is not None
 
@@ -103,10 +121,7 @@ class TestLLMGeneration:
 
     def test_raises_without_schema(self, sample_csv):
         with pytest.raises(ValueError, match="target_schema"):
-            smart_transform(
-                sample_csv, registry=DictRegistry(),
-                llm=MockLLM(_valid_llm_response()),
-            )
+            smart_transform(sample_csv, registry=DictRegistry(), llm=_make_llm(_valid_config()))
 
 
 class TestReviewFn:
@@ -117,9 +132,12 @@ class TestReviewFn:
             return FormatConfig(name="reviewed", columns=cfg.columns)
 
         lf = smart_transform(
-            sample_csv, registry=reg, target_schema=schema,
-            llm=MockLLM(_valid_llm_response()),
-            review_fn=review, auto_register=True,
+            sample_csv,
+            registry=reg,
+            target_schema=schema,
+            llm=_make_llm(_valid_config()),
+            review_fn=review,
+            auto_register=True,
         )
         assert reg.get("reviewed") is not None
         assert len(lf.collect()) == 2
@@ -127,7 +145,9 @@ class TestReviewFn:
     def test_review_fn_rejection(self, sample_csv, schema):
         with pytest.raises(FormatDetectionError, match="rejected"):
             smart_transform(
-                sample_csv, registry=DictRegistry(), target_schema=schema,
-                llm=MockLLM(_valid_llm_response()),
+                sample_csv,
+                registry=DictRegistry(),
+                target_schema=schema,
+                llm=_make_llm(_valid_config()),
                 review_fn=lambda cfg, df: None,
             )
