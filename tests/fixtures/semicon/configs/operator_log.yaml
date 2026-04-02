@@ -1,0 +1,59 @@
+name: operator_log
+description: >
+  Operator-entered Excel log — maximum human messiness. Lot # mixes integers
+  (1234, 1235, 1237) and strings (L001236, L00500x). Wafer Count mixes plain
+  integers, "25 wafers" strings, and "~13" approximations. Start Time has a
+  different date format on every row. End Time uses multiple null sentinels.
+  Priority is free text (HOT, HOT!, normal, Med, low, LOW).
+  Recipe row 0 contains an embedded comma: "M1_ETCH,V3".
+  On Hold? uses Y/N/yes/no/YES/blank.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+  sheet_name: OperatorLog
+columns:
+  - target: lot_id
+    # Normalise: integers → "L" + zero-padded 6 digits; strings already correct
+    expr: >
+      when(col("Lot #").cast("str").str.starts_with("L"), col("Lot #").cast("str"))
+      .otherwise("L" + col("Lot #").cast("str").str.slice(0, 6))
+  - target: wafer_count
+    # Strip " wafers" suffix, strip "~" prefix, then cast to int32
+    expr: 'col("Wafer Count").cast("str").str.replace(" wafers", "").str.replace("~", "").str.strip().cast("int32")'
+  - target: operation
+    source: Operation
+  - target: step_sequence
+    source: Step
+    dtype: int32
+  - target: tool_id
+    source: Tool
+  - target: track_in_time
+    # Highly varied formats — rely on Polars inference via cast or use a best-effort parse
+    source: Start Time
+  - target: track_out_time
+    # Null sentinels: N/A, "still running", "-", blank → null; else parse as datetime
+    expr: >
+      when(col("End Time").is_null() | col("End Time").cast("str") == "N/A"
+           | col("End Time").cast("str") == "still running"
+           | col("End Time").cast("str") == "-"
+           | col("End Time").cast("str") == "",
+           null)
+      .otherwise(col("End Time"))
+  - target: recipe
+    source: Recipe
+  - target: route
+    source: Route
+  - target: priority
+    expr: >
+      when(col("Priority").str.to_uppercase().str.contains("HOT"), 1)
+      .when(col("Priority").str.to_uppercase() == "MED", 2)
+      .when(col("Priority").str.to_uppercase() == "NORMAL", 2)
+      .when(col("Priority").str.to_uppercase() == "LOW", 3)
+      .otherwise(4)
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("On Hold?").cast("str").str.to_uppercase().str.strip().str.contains("Y")'
+  - target: data_source
+    constant: operator_log
+drop_unmapped: true

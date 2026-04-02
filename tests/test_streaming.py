@@ -76,11 +76,7 @@ class TestLargeCSV:
                 ColumnMapping(target="cat", source="category"),
             ],
         )
-        result = (
-            transform(large_csv, config)
-            .filter(pl.col("cat") == "A")
-            .collect()
-        )
+        result = transform(large_csv, config).filter(pl.col("cat") == "A").collect()
         assert len(result) == 50_000
 
     def test_large_csv_dry_run_limits_rows(self, large_csv):

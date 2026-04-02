@@ -68,9 +68,7 @@ class TestCamstarLotMovement:
         result = transform(csv_path, config).collect()
         assert isinstance(result["track_in_time"].dtype, pl.Datetime)
 
-    def test_schema_lazy_validation_passes(
-        self, config: FormatConfig, csv_path: str, schema: TargetSchema
-    ) -> None:
+    def test_schema_lazy_validation_passes(self, config: FormatConfig, csv_path: str, schema: TargetSchema) -> None:
         lf = transform(csv_path, config)
         # Should not raise
         schema.validate_lazy(lf)
@@ -92,9 +90,7 @@ class TestFabxLotMovement:
         assert config.name == "fabx_lot_movement"
         assert config.reader.separator == "\t"
 
-    def test_transform_produces_expected_columns(
-        self, config: FormatConfig, tsv_path: str
-    ) -> None:
+    def test_transform_produces_expected_columns(self, config: FormatConfig, tsv_path: str) -> None:
         result = transform(tsv_path, config).collect()
         expected_cols = {
             "lot_id",

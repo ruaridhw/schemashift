@@ -1,0 +1,51 @@
+name: partner_fab_jp
+description: >
+  Partner fab (Japan) TSV export with Japanese column headers. Scrambled column order.
+  Track_in uses mixed date formats: YYYY-MM-DD, YYYY/MM/DD, DD-Mon-YYYY.
+  Track_out for some rows is millisecond Unix epoch (integer string), others are
+  ISO date strings. Hold as Japanese: なし=false, 品質/技術=true.
+version: 1
+target_schema: lot_movement
+reader:
+  skip_rows: 0
+  separator: "\t"
+  encoding: utf-8
+columns:
+  - target: lot_id
+    source: "ロット番号"
+  - target: wafer_count
+    source: "ウェーハ数"
+    dtype: int32
+  - target: operation
+    source: "工程"
+  - target: step_sequence
+    source: "工程順序"
+    dtype: int32
+  - target: tool_id
+    source: "装置"
+  - target: track_in_time
+    # Mixed formats: YYYY-MM-DD, YYYY/MM/DD HH:MM:SS, DD-Mon-YYYY HH:MM:SS
+    # Normalise slashes to dashes first, then parse
+    expr: 'col("開始時刻").str.replace("/", "-").str.to_datetime("%Y-%m-%d %H:%M:%S")'
+  - target: track_out_time
+    # Some values are millisecond epoch strings (e.g. "1710496701000"),
+    # others are date strings "YYYY-MM-DD HH:MM:SS", empty string = null.
+    # Detect ms epoch by string length >= 13 digits.
+    expr: >
+      when(col("終了時刻") == "", null)
+      .when(col("終了時刻").str.lengths() >= 13,
+            col("終了時刻").cast("int64") * 1000)
+      .otherwise(col("終了時刻").str.to_datetime("%Y-%m-%d %H:%M:%S").dt.timestamp() * 1000)
+    dtype: datetime
+  - target: recipe
+    source: "レシピ"
+  - target: route
+    source: "ルート"
+  - target: priority
+    source: "優先度"
+    dtype: int32
+  - target: hold_flag
+    expr: 'col("保留") != "なし"'
+  - target: data_source
+    constant: partner_fab_jp
+drop_unmapped: true

@@ -116,29 +116,19 @@ class TestTransformCommand:
         # Should contain at least the column names or some data
         assert "identifier" in result.output or "customer" in result.output
 
-    def test_transform_outputs_csv_file(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_transform_outputs_csv_file(self, runner: CliRunner, tmp_path: Path) -> None:
         out_path = str(tmp_path / "out.csv")
-        result = runner.invoke(
-            cli, ["transform", SAMPLE_CSV, "--config", SALES_CONFIG, "--output", out_path]
-        )
+        result = runner.invoke(cli, ["transform", SAMPLE_CSV, "--config", SALES_CONFIG, "--output", out_path])
         assert result.exit_code == 0
         assert Path(out_path).exists()
 
-    def test_transform_outputs_parquet_file(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_transform_outputs_parquet_file(self, runner: CliRunner, tmp_path: Path) -> None:
         out_path = str(tmp_path / "out.parquet")
-        result = runner.invoke(
-            cli, ["transform", SAMPLE_CSV, "--config", SALES_CONFIG, "--output", out_path]
-        )
+        result = runner.invoke(cli, ["transform", SAMPLE_CSV, "--config", SALES_CONFIG, "--output", out_path])
         assert result.exit_code == 0
         assert Path(out_path).exists()
 
-    def test_transform_with_registry_auto_detects(
-        self, runner: CliRunner, registry_dir: Path
-    ) -> None:
+    def test_transform_with_registry_auto_detects(self, runner: CliRunner, registry_dir: Path) -> None:
         result = runner.invoke(
             cli,
             ["transform", SAMPLE_CSV, "--registry", str(registry_dir)],
@@ -151,9 +141,7 @@ class TestTransformCommand:
         assert result.exit_code != 0
 
     def test_transform_nonexistent_file_errors(self, runner: CliRunner) -> None:
-        result = runner.invoke(
-            cli, ["transform", "/no/such/file.csv", "--config", SALES_CONFIG]
-        )
+        result = runner.invoke(cli, ["transform", "/no/such/file.csv", "--config", SALES_CONFIG])
         assert result.exit_code != 0
 
 

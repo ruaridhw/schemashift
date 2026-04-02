@@ -91,6 +91,4 @@ def test_fuzz_input_never_crashes(expression: str) -> None:
     except DSLSyntaxError:
         pass  # Expected
     except Exception as exc:
-        pytest.fail(
-            f"Parser raised {type(exc).__name__}: {exc!r} for input {expression!r}"
-        )
+        pytest.fail(f"Parser raised {type(exc).__name__}: {exc!r} for input {expression!r}")

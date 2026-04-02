@@ -5,7 +5,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from schemashift.errors import ReaderError, UnsupportedFileError
+from schemashift.errors import UnsupportedFileError
 from schemashift.models import ReaderConfig
 from schemashift.readers import read_file, read_header
 

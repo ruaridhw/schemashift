@@ -5,11 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.registry import DictRegistry, FileSystemRegistry
-
 
 # ---------------------------------------------------------------------------
 # Helpers

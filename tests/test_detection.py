@@ -4,11 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from schemashift.errors import AmbiguousFormatError
 from schemashift.detection import detect_format
+from schemashift.errors import AmbiguousFormatError
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.registry import DictRegistry
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,9 +22,7 @@ def _make_config(name: str, source_cols: list[str]) -> FormatConfig:
 
 def _make_expr_config(name: str, expr_cols: list[str]) -> FormatConfig:
     """Build a FormatConfig that references columns via DSL expr."""
-    columns = [
-        ColumnMapping(target="result", expr=" + ".join(f'col("{c}")' for c in expr_cols))
-    ]
+    columns = [ColumnMapping(target="result", expr=" + ".join(f'col("{c}")' for c in expr_cols))]
     return FormatConfig(name=name, columns=columns)
 
 
