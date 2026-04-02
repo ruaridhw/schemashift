@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from pathlib import Path
 from typing import Any
 
 import polars as pl
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
+from langchain_core.tools import tool
 from pydantic import ValidationError
 
 from .errors import LLMGenerationError
 from .models import FormatConfig
+from .readers import read_file
 from .target_schema import TargetSchema
 from .transform import dry_run, validate_config
 
@@ -50,25 +53,15 @@ DSL Expression Reference:
 
 _JSON_BLOCK_RE = re.compile(r"```json\s*\n(.*?)\n\s*```", re.DOTALL)
 _OUTERMOST_BRACES_RE = re.compile(r"\{.*\}", re.DOTALL)
-_RETRY_SUFFIX = "\n\nPlease fix and return only valid JSON."
 
 
 def _extract_json(text: str) -> str:
-    """Extract a JSON object string from LLM response text.
+    """Extract a JSON object string from text.
 
     Tries three strategies in order:
     1. A ```json...``` fenced code block.
     2. The outermost ``{...}`` span in the text.
     3. Raises :class:`~schemashift.errors.LLMGenerationError`.
-
-    Args:
-        text: Raw text returned by the LLM.
-
-    Returns:
-        The extracted JSON string (not yet parsed).
-
-    Raises:
-        LLMGenerationError: When no JSON object can be located.
     """
     m = _JSON_BLOCK_RE.search(text)
     if m:
@@ -88,7 +81,7 @@ def build_prompt(
     example_configs: list[FormatConfig] | None = None,
     format_name: str = "unknown_format",
 ) -> str:
-    """Build an LLM prompt requesting a FormatConfig JSON for a given file.
+    """Build a prompt requesting a FormatConfig for the given file.
 
     Args:
         sample_df: A small sample of the source data.
@@ -103,8 +96,9 @@ def build_prompt(
     parts: list[str] = []
 
     parts.append(
-        "You are a data engineering assistant. Generate a FormatConfig JSON that maps "
-        f"columns from a source file named '{format_name}' to the target schema below."
+        "You are a data engineering assistant. Call the submit_format_config tool with a "
+        f"FormatConfig that maps columns from a source file named '{format_name}' to the "
+        "target schema below."
     )
 
     # Target schema
@@ -142,29 +136,6 @@ def build_prompt(
         for ex in example_configs:
             parts.append(ex.model_dump_json(indent=2))
 
-    # Output instructions
-    parts.append(
-        "\n## Output Instructions\n"
-        "Return ONLY a valid JSON object matching the FormatConfig schema. "
-        "No explanation, no code blocks.\n\n"
-        "FormatConfig schema:\n"
-        "{\n"
-        '  "name": "<format name>",\n'
-        '  "description": "<optional description>",\n'
-        '  "columns": [\n'
-        "    {\n"
-        '      "target": "<target column name>",\n'
-        '      "source": "<source column name>",   // OR\n'
-        '      "expr": "<DSL expression>",          // OR\n'
-        '      "constant": <value>,                 // exactly one of source/expr/constant\n'
-        '      "dtype": "<optional cast dtype>",\n'
-        '      "fillna": <optional fill value>\n'
-        "    }\n"
-        "  ],\n"
-        '  "drop_unmapped": true\n'
-        "}"
-    )
-
     return "\n".join(parts)
 
 
@@ -177,12 +148,17 @@ def generate_config(
     max_retries: int = 2,
     sample_rows: int = 15,
 ) -> FormatConfig:
-    """Generate a FormatConfig for the given file using an LLM.
+    """Generate a FormatConfig for the given file using the LangChain agent API.
+
+    Creates an agent via :func:`langchain.agents.create_agent` with a single
+    ``submit_format_config`` tool.  The agent calls the tool with a candidate
+    config; validation errors (Pydantic, DSL, dry-run) are returned as tool
+    result strings so the agent can self-correct up to *max_retries* times.
 
     Args:
         path: Path to the source data file.
         target_schema: The desired output schema.
-        llm: A LangChain BaseChatModel-compatible object (uses ``invoke``).
+        llm: A LangChain ``BaseChatModel`` instance.
         example_configs: Optional existing FormatConfigs to include as examples.
         format_name: Name for the generated config. Defaults to the file stem.
         max_retries: Number of additional attempts after the first failure.
@@ -192,99 +168,86 @@ def generate_config(
         A validated :class:`~schemashift.models.FormatConfig`.
 
     Raises:
-        LLMGenerationError: When a valid config cannot be generated within the allowed attempts.
+        LLMGenerationError: When the agent fails to produce a valid config.
+            ``error.attempts`` contains per-attempt details.
     """
-    from schemashift.readers import read_file
-
-    df = read_file(path).head(sample_rows).collect()
-    file_columns = list(df.columns)
-
+    df: pl.DataFrame = read_file(path).head(sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
-    prompt = build_prompt(df, target_schema, file_columns, example_configs, inferred_name)
+    prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name)
 
-    last_error: str = ""
-    total_attempts = max_retries + 1
-    all_attempts: list[dict] = []
+    # Side-channels: the tool captures its result and all attempt records here.
+    result_box: list[FormatConfig] = []
+    all_attempts: list[dict[str, Any]] = []
 
-    for attempt_num in range(1, total_attempts + 1):
-        response: str | None = None
-        attempt_error: str | None = None
+    @tool
+    def submit_format_config(
+        columns: list[dict],
+        name: str = "",
+        description: str = "",
+        drop_unmapped: bool = True,
+    ) -> str:
+        """Submit the generated FormatConfig mapping source columns to the target schema.
 
-        # Call the LLM
-        response = llm.invoke(prompt).content
+        Each column dict must contain 'target' and exactly one of: 'source' (direct
+        column rename), 'expr' (DSL expression string), or 'constant' (literal value).
+        Optional per-column keys: 'dtype' (cast type), 'fillna' (fill-null value).
+        Returns 'Config accepted.' on success, or an error description to fix and retry.
+        """
+        data: dict[str, Any] = {
+            "name": name or inferred_name,
+            "description": description,
+            "columns": columns,
+            "drop_unmapped": drop_unmapped,
+        }
 
-        # 1. Extract JSON text
-        try:
-            json_str = _extract_json(response)
-        except LLMGenerationError as exc:
-            last_error = str(exc)
-            attempt_error = last_error
-            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
-            _log.warning(
-                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
-            )
-            prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
-            continue
-
-        # 2. Parse JSON
-        try:
-            data: dict[str, Any] = json.loads(json_str)
-        except json.JSONDecodeError as exc:
-            last_error = str(exc)
-            attempt_error = last_error
-            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
-            _log.warning(
-                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
-            )
-            prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
-            continue
-
-        # 3. Inject name if missing
-        if not data.get("name"):
-            data["name"] = inferred_name
-
-        # 4. Validate with Pydantic
         try:
             config = FormatConfig.model_validate(data)
         except (ValidationError, Exception) as exc:
-            last_error = str(exc)
-            attempt_error = last_error
-            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
-            _log.warning(
-                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
-            )
-            prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
-            continue
+            error = str(exc)
+            all_attempts.append({"response": data, "error": error})
+            _log.warning("FormatConfig validation attempt failed: %s", error)
+            return f"Validation error: {error}"
 
-        # 5. Validate DSL expressions and dtypes
-        errors = validate_config(config)
-        if errors:
-            last_error = "\n".join(errors)
-            attempt_error = last_error
-            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
-            _log.warning(
-                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
-            )
-            prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
-            continue
+        dsl_errors = validate_config(config)
+        if dsl_errors:
+            error = "\n".join(dsl_errors)
+            all_attempts.append({"response": data, "error": error})
+            _log.warning("FormatConfig validation attempt failed: %s", error)
+            return f"DSL errors:\n{error}"
 
-        # 6. Dry run against the actual file
         try:
             dry_run(config, path, n_rows=5)
         except Exception as exc:
-            last_error = str(exc)
-            attempt_error = last_error
-            all_attempts.append({"prompt": prompt, "response": response, "error": attempt_error})
-            _log.warning(
-                "LLM generation attempt %d/%d failed: %s", attempt_num, total_attempts, last_error
-            )
-            prompt += f"\n\nThe previous response had errors:\n{last_error}" + _RETRY_SUFFIX
-            continue
+            error = str(exc)
+            all_attempts.append({"response": data, "error": error})
+            _log.warning("FormatConfig validation attempt failed: %s", error)
+            return f"Runtime error during dry run: {error}"
 
-        all_attempts.append({"prompt": prompt, "response": response, "error": None})
-        return config
+        all_attempts.append({"response": data, "error": None})
+        result_box.append(config)
+        return "Config accepted."
+
+    # Each agent step is one LLM call + one tool call = 2 graph nodes.
+    # Add a small buffer for the final LLM "I'm done" step.
+    recursion_limit = (max_retries + 1) * 3 + 2
+
+    agent = create_agent(llm, [submit_format_config])
+    try:
+        agent.invoke(
+            {"messages": [HumanMessage(content=prompt)]},
+            config={"recursion_limit": recursion_limit},
+        )
+    except Exception as exc:
+        if result_box:
+            return result_box[0]
+        if not all_attempts:
+            all_attempts.append({"response": "", "error": str(exc)})
+        raise LLMGenerationError(str(exc), attempts=all_attempts) from exc
+
+    if result_box:
+        return result_box[0]
 
     raise LLMGenerationError(
-        f"Failed to generate valid config after {total_attempts} attempts: {last_error}",
+        "Agent completed without submitting a valid config",
         attempts=all_attempts,
     )
