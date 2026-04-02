@@ -47,7 +47,7 @@ def transform(file: str, config: str | None, registry: str | None, output: str |
         else:
             raise click.UsageError("Provide either --config or --registry.")
 
-        df = lf.collect()
+        df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
 
         if output is not None:
             _write_output(df, output)
@@ -202,9 +202,7 @@ def list_configs(registry: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_schema(
-    target_schema_path: str | None, registry_path: str | None
-) -> TargetSchema:
+def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -> TargetSchema:
     """Resolve a TargetSchema from an explicit path or a registry schemas/ dir.
 
     Resolution order:
@@ -227,43 +225,59 @@ def _resolve_schema(
             elif len(yamls) > 1:
                 names = [y.name for y in yamls]
                 raise click.UsageError(
-                    f"Multiple schemas found in '{schemas_dir}': {names}. "
-                    f"Use --target-schema to specify one."
+                    f"Multiple schemas found in '{schemas_dir}': {names}. Use --target-schema to specify one."
                 )
 
-    raise click.UsageError(
-        "Provide --target-schema or --registry with a schemas/ subdirectory."
-    )
+    raise click.UsageError("Provide --target-schema or --registry with a schemas/ subdirectory.")
 
 
 def _load_default_llm() -> Any:
     """Load a LangChain LLM from environment variables.
 
-    Prefers Anthropic (claude-haiku-4-5) when ANTHROPIC_API_KEY is set,
-    falls back to OpenAI (gpt-4o-mini) when OPENAI_API_KEY is set.
+    Resolution order:
+    1. Azure AI Foundry — when FOUNDRY_API_KEY is set alongside FOUNDRY_ENDPOINT
+       or FOUNDRY_RESOURCE (e.g. 'parsnip-resource'). MODEL_NAME selects the
+       deployment (defaults to 'claude-haiku-4-5').
+    2. Anthropic — when ANTHROPIC_API_KEY is set.
     """
     import os
+
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass  # python-dotenv optional; env vars may already be set
+
+    foundry_key = os.getenv("FOUNDRY_API_KEY")
+    foundry_endpoint = os.getenv("FOUNDRY_ENDPOINT")
+    foundry_resource = os.getenv("FOUNDRY_RESOURCE")
+    if foundry_key and (foundry_endpoint or foundry_resource):
+        try:
+            from langchain_azure_ai.chat_models import AzureAIChatCompletionsModel
+        except ImportError as exc:
+            raise click.ClickException("langchain-azure-ai is not installed. Run: uv add 'schemashift[llm]'") from exc
+        endpoint = (
+            foundry_endpoint or f"https://{foundry_resource}.services.ai.azure.com/api/projects/{foundry_resource}"
+        )
+        model_name = os.getenv("MODEL_NAME", "claude-haiku-4-5")
+        return AzureAIChatCompletionsModel(
+            endpoint=endpoint,
+            credential=foundry_key,
+            model_name=model_name,
+        )
 
     if os.getenv("ANTHROPIC_API_KEY"):
         try:
             from langchain_anthropic import ChatAnthropic
-        except ImportError:
-            raise click.ClickException(
-                "langchain-anthropic is not installed. Run: uv add 'schemashift[llm]'"
-            )
-        return ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
-
-    if os.getenv("OPENAI_API_KEY"):
-        try:
-            from langchain_openai import ChatOpenAI
-        except ImportError:
-            raise click.ClickException(
-                "langchain-openai is not installed. Run: pip install langchain-openai"
-            )
-        return ChatOpenAI(model="gpt-4o-mini", temperature=0)
+        except ImportError as exc:
+            raise click.ClickException("langchain-anthropic is not installed. Run: uv add 'schemashift[llm]'") from exc
+        return ChatAnthropic(
+            model="claude-haiku-4-5-20251001", temperature=0
+        )  # ty: ignore[missing-argument, unknown-argument]
 
     raise click.ClickException(
-        "No LLM API key found. Set ANTHROPIC_API_KEY (recommended) or OPENAI_API_KEY."
+        "No LLM API key found. Set FOUNDRY_API_KEY + FOUNDRY_ENDPOINT (Azure AI Foundry) or ANTHROPIC_API_KEY."
     )
 
 
@@ -284,6 +298,4 @@ def _write_output(df: pl.DataFrame, output: str) -> None:
     elif ext == ".json":
         df.write_json(output)
     else:
-        raise click.UsageError(
-            f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json."
-        )
+        raise click.UsageError(f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json.")
