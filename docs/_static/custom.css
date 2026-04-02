@@ -1,0 +1,10 @@
+/* Tighten up the hero section on the homepage */
+.hero-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+}
+
+/* Slightly wider content area for code-heavy pages */
+.wy-nav-content {
+    max-width: 1000px;
+}
