@@ -10,7 +10,7 @@ Transform tabular files (CSV, XLSX, Parquet, JSON, TSV) into a canonical schema 
 # Core library
 pip install schemashift
 
-# With LLM config generation (requires ANTHROPIC_API_KEY)
+# With LLM config generation
 pip install "schemashift[llm]"
 ```
 
@@ -75,12 +75,22 @@ result = ss.auto_transform("data.csv", registry=registry)
 When a file arrives from a new source with no matching config, `smart_transform` generates one automatically:
 
 ```python
-from langchain_anthropic import ChatAnthropic
 import schemashift as ss
 
-llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 schema = ss.TargetSchema.from_yaml("schemas/certificates.yaml")
 registry = ss.FileSystemRegistry("./configs/")
+
+# bring your own LangChain-compatible LLM:
+from langchain_anthropic import ChatAnthropic
+llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
+
+# or via Azure AI Foundry:
+from langchain_azure_ai.chat_models import AzureAIChatCompletionsModel
+llm = AzureAIChatCompletionsModel(
+    endpoint="https://<resource>.services.ai.azure.com/api/projects/<project>",
+    credential="<FOUNDRY_API_KEY>",
+    model_name="claude-haiku-4-5",
+)
 
 result = ss.smart_transform(
     "unknown_source.csv",
@@ -117,7 +127,7 @@ schemashift validate provider_x.json
 # Dry-run a config against sample data (first 10 rows)
 schemashift dry-run provider_x.json --sample data.csv
 
-# Generate a config for an unknown file (requires ANTHROPIC_API_KEY)
+# Generate a config for an unknown file (requires LLM credentials — see below)
 schemashift generate data.csv --target-schema schemas/certificates.yaml --output new_config.json
 
 # Generate with interactive review before saving
@@ -125,6 +135,32 @@ schemashift generate data.csv --registry ./configs/ --interactive
 
 # List registered configs
 schemashift list --registry ./configs/
+```
+
+### LLM credentials
+
+The `generate` command auto-detects credentials from environment variables (a `.env` file in the working directory is loaded automatically):
+
+| Priority | Variables | Provider |
+|----------|-----------|----------|
+| 1 | `FOUNDRY_API_KEY` + `FOUNDRY_ENDPOINT` (or `FOUNDRY_RESOURCE`) | Azure AI Foundry |
+| 2 | `ANTHROPIC_API_KEY` | Anthropic |
+
+**Azure AI Foundry** (e.g. an Azure AI project running Claude):
+
+```bash
+FOUNDRY_API_KEY=<key>
+FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<project>
+MODEL_NAME=claude-haiku-4-5   # optional, this is the default
+```
+
+If you only set `FOUNDRY_RESOURCE` (without `FOUNDRY_ENDPOINT`), the endpoint is inferred as
+`https://<FOUNDRY_RESOURCE>.services.ai.azure.com/api/projects/<FOUNDRY_RESOURCE>`.
+
+**Anthropic (direct)**:
+
+```bash
+ANTHROPIC_API_KEY=<key>
 ```
 
 ## Expression DSL
