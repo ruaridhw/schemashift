@@ -27,7 +27,7 @@ from .ast_nodes import (
 # Type mapping for cast()
 # ---------------------------------------------------------------------------
 
-_CAST_TYPES: dict[str, pl.PolarsDataType] = {
+_CAST_TYPES: dict[str, type[pl.DataType]] = {
     "str": pl.Utf8,
     "utf8": pl.Utf8,
     "string": pl.Utf8,
@@ -67,11 +67,7 @@ def _literal_str(node: ASTNode, method: str) -> str:
 
 def _literal_int(node: ASTNode, method: str) -> int:
     """Extract a Python int from a Literal node."""
-    if (
-        not isinstance(node, Literal)
-        or not isinstance(node.value, int)
-        or isinstance(node.value, bool)
-    ):
+    if not isinstance(node, Literal) or not isinstance(node.value, int) or isinstance(node.value, bool):
         raise DSLSyntaxError(
             f"'{method}' requires an integer literal argument",
             expression="",
@@ -82,11 +78,7 @@ def _literal_int(node: ASTNode, method: str) -> int:
 
 def _literal_int_or_float(node: ASTNode, method: str) -> int | float:
     """Extract a Python int or float from a Literal node (for round(n))."""
-    if (
-        not isinstance(node, Literal)
-        or not isinstance(node.value, (int, float))
-        or isinstance(node.value, bool)
-    ):
+    if not isinstance(node, Literal) or not isinstance(node.value, (int, float)) or isinstance(node.value, bool):
         raise DSLSyntaxError(
             f"'{method}' requires a numeric literal argument",
             expression="",
@@ -197,8 +189,7 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
             type_str = _literal_str(args[0], method).lower()
             if type_str not in _CAST_TYPES:
                 raise DSLSyntaxError(
-                    f"Unknown cast type: {type_str!r}. "
-                    f"Valid types: {sorted(_CAST_TYPES)!r}",
+                    f"Unknown cast type: {type_str!r}. Valid types: {sorted(_CAST_TYPES)!r}",
                     expression="",
                     position=-1,
                 )
