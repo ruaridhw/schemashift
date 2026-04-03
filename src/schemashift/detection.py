@@ -30,6 +30,11 @@ def detect_format(
 
     for config in registry.list_configs():
         required = config.source_columns()
+        # Configs whose every mapping uses `constant` (no source columns) are
+        # intentionally excluded from detection — they match any file, so they
+        # would always cause AmbiguousFormatError when combined with real configs.
+        # Such configs must be applied explicitly via --config rather than
+        # auto-detected from the registry.
         if required and required.issubset(column_set):
             matches.append(config)
 
