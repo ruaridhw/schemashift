@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from . import dsl as _dsl_module
 from .errors import LLMGenerationError
-from .models import FormatConfig
+from .models import FormatConfig, ReaderConfig
 from .readers import read_file
 from .target_schema import TargetSchema
 from .transform import dry_run, validate_config
@@ -149,6 +149,7 @@ def generate_config(
     max_retries: int = 2,
     n_sample_rows: int = 15,
     user_prompt: str | None = None,
+    reader_config: ReaderConfig | None = None,
 ) -> FormatConfig:
     """Generate a FormatConfig for the given file using the LangChain agent API.
 
@@ -167,6 +168,9 @@ def generate_config(
         n_sample_rows: Number of rows to sample from the file for the prompt.
         user_prompt: Optional extra context for the LLM (e.g. unit conventions,
             timestamp formats).
+        reader_config: Optional reader configuration forwarded to :func:`read_file`
+            when sampling rows. Required for files with non-default separators or
+            skip_rows.
 
     Returns:
         A validated :class:`~schemashift.models.FormatConfig`.
@@ -182,7 +186,7 @@ def generate_config(
     except ImportError as exc:
         raise ImportError("langchain is not installed. Run: pip install 'schemashift[llm]'") from exc
 
-    df: pl.DataFrame = read_file(path).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
+    df: pl.DataFrame = read_file(path, reader_config).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
     prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name, user_prompt=user_prompt)
 
