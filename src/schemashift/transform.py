@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import polars as pl
 
@@ -14,6 +14,8 @@ from schemashift.readers import read_file
 from schemashift.registry import Registry
 
 if TYPE_CHECKING:
+    from langchain_core.language_models import BaseChatModel
+
     from schemashift.target_schema import TargetSchema
 
 
@@ -142,7 +144,7 @@ def smart_transform(
     path: str | Path,
     registry: Registry,
     target_schema: "TargetSchema | None" = None,
-    llm: Any = None,  # ANNOT: the typing here should be stronger
+    llm: "BaseChatModel | None" = None,
     review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
     auto_register: bool = False,
     example_configs: list[FormatConfig] | None = None,
