@@ -5,9 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import polars as pl
-from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage
-from langchain_core.tools import tool
 from pydantic import ValidationError
 
 from . import dsl as _dsl_module
@@ -168,6 +165,13 @@ def generate_config(
         LLMGenerationError: When the agent fails to produce a valid config.
             ``error.attempts`` contains per-attempt details.
     """
+    try:
+        from langchain.agents import create_agent
+        from langchain_core.messages import HumanMessage
+        from langchain_core.tools import tool
+    except ImportError as exc:
+        raise ImportError("langchain is not installed. Run: pip install 'schemashift[llm]'") from exc
+
     df: pl.DataFrame = read_file(path).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
     prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name)
