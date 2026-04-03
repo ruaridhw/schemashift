@@ -72,6 +72,7 @@ per-file-ignores = { "tests/fixtures/**" = ["E501", "UP017", "SIM108"], "whiteli
 
 [tool.black]
 line-length = 120
+target-version = ["py312"]
 
 [tool.coverage.run]
 source = ["schemashift"]
