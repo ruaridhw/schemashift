@@ -84,6 +84,8 @@ def build_prompt(
         file_columns: Column names present in the source file.
         example_configs: Optional list of existing FormatConfigs to show as examples.
         format_name: Suggested name for the new format config.
+        prompt: Optional extra context appended to the prompt (e.g. unit
+            conventions, timestamp formats).
 
     Returns:
         A prompt string ready to send to an LLM.
@@ -163,6 +165,8 @@ def generate_config(
         format_name: Name for the generated config. Defaults to the file stem.
         max_retries: Number of additional attempts after the first failure.
         n_sample_rows: Number of rows to sample from the file for the prompt.
+        prompt: Optional extra context for the LLM (e.g. unit conventions,
+            timestamp formats).
 
     Returns:
         A validated :class:`~schemashift.models.FormatConfig`.
