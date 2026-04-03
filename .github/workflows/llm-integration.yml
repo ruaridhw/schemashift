@@ -21,4 +21,6 @@ jobs:
       - name: Run LLM integration tests
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FOUNDRY_API_KEY: ${{ secrets.FOUNDRY_API_KEY }}
+          FOUNDRY_RESOURCE: ${{ secrets.FOUNDRY_RESOURCE }}
         run: uv run pytest -m llm -v --no-header
