@@ -89,8 +89,11 @@ class FileSystemRegistry(Registry):
     def list_configs(self) -> list[FormatConfig]:
         configs: list[FormatConfig] = []
         for p in sorted(self._path.glob("*.json")):
-            data = json.loads(p.read_text(encoding="utf-8"))
-            configs.append(FormatConfig.model_validate(data))
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                configs.append(FormatConfig.model_validate(data))
+            except Exception as exc:
+                raise ConfigValidationError(f"Failed to load config from '{p}': {exc}") from exc
         return configs
 
     def delete(self, name: str) -> bool:
