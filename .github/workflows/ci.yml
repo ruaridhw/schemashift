@@ -25,13 +25,15 @@ jobs:
       - name: black
         run: uv run black --check src tests
 
-      - name: isort
-        run: uv run isort --check-only src tests
+      - name: vulture
+        run: uv run vulture
+
+      - name: typos
+        run: uv run typos
 
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    needs: lint
     strategy:
       fail-fast: false
       matrix:
