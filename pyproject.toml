@@ -113,6 +113,9 @@ extend-exclude = ["src/schemashift/dsl/tables/"]
 locale = "en-gb"
 extend-ignore-re = ["(?Rm)^.*#\\s*ignore:typo$"]
 
+[tool.typos.default.extend-words]
+promis = "promis"
+
 [dependency-groups]
 dev = [
     "openpyxl>=3.1",
