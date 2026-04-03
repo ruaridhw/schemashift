@@ -5,6 +5,7 @@ from pathlib import Path
 import polars as pl
 import pytest
 
+from schemashift.dtypes import polars_dtype
 from schemashift.errors import SchemaValidationError
 from schemashift.target_schema import TargetColumn, TargetSchema
 
@@ -112,13 +113,13 @@ class TestPolarsDtype:
             ("categorical", pl.Categorical),
         ],
     )
-    def test_dtype_mapping(self, test_schema, type_str, expected):
-        result = test_schema.polars_dtype(type_str)
+    def test_dtype_mapping(self, type_str, expected):
+        result = polars_dtype(type_str)
         assert type(result) is type(expected)
 
-    def test_unknown_type_raises_schema_validation_error(self, test_schema):
+    def test_unknown_type_raises_schema_validation_error(self):
         with pytest.raises(SchemaValidationError, match="Unknown type string"):
-            test_schema.polars_dtype("bigint")
+            polars_dtype("bigint")
 
 
 class TestValidateLazy:
