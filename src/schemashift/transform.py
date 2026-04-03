@@ -8,7 +8,7 @@ import polars as pl
 
 from schemashift.dsl import parse_and_compile
 from schemashift.dtypes import DTYPE_MAP
-from schemashift.errors import DSLRuntimeError, DSLSyntaxError, FormatDetectionError
+from schemashift.errors import DSLRuntimeError, DSLSyntaxError, FormatDetectionError, ReviewRejectedError
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.readers import read_file
 from schemashift.registry import Registry
@@ -219,7 +219,7 @@ def smart_transform(
         sample_df = dry_run(config, path, n_rows=10)
         reviewed = review_fn(config, sample_df)
         if reviewed is None:
-            raise FormatDetectionError("Config was rejected by review_fn")
+            raise ReviewRejectedError("Config was rejected by review_fn")
         config = reviewed
 
     if auto_register:

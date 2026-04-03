@@ -9,6 +9,7 @@ from schemashift.errors import (
     FormatDetectionError,
     LLMGenerationError,
     ReaderError,
+    ReviewRejectedError,
     SchemaShiftError,
     SchemaValidationError,
     UnsupportedFileError,
@@ -54,5 +55,6 @@ __all__ = [
     "UnsupportedFileError",
     "LLMGenerationError",
     "ReaderError",
+    "ReviewRejectedError",
     "load_default_llm",
 ]
