@@ -16,6 +16,7 @@ from schemashift.errors import (
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
+from schemashift.schema import get_schema, get_schema_path
 from schemashift.target_schema import TargetSchema
 from schemashift.transform import (
     auto_transform,
@@ -26,6 +27,8 @@ from schemashift.transform import (
 )
 
 __all__ = [
+    "get_schema",
+    "get_schema_path",
     "ColumnMapping",
     "FormatConfig",
     "ReaderConfig",

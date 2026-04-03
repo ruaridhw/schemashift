@@ -180,6 +180,19 @@ def generate(  # noqa: PLR0913
         sys.exit(1)
 
 
+@cli.command()
+@click.option("--output", "-o", default=None, help="Write schema to FILE instead of stdout.")
+def schema(output: str | None) -> None:
+    """Print the JSON Schema for FormatConfig."""
+    data = {"$schema": "http://json-schema.org/draft-07/schema#", **FormatConfig.model_json_schema()}
+    text = json.dumps(data, indent=2, sort_keys=True)
+    if output is not None:
+        Path(output).write_text(text, encoding="utf-8")
+        click.echo(f"Schema written to '{output}'.")
+    else:
+        click.echo(text)
+
+
 @cli.command(name="list")
 @click.option("--registry", "-r", required=True, help="Registry directory.")
 def list_configs(registry: str) -> None:
