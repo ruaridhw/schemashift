@@ -74,6 +74,7 @@ def build_prompt(
     file_columns: list[str],
     example_configs: list[FormatConfig] | None = None,
     format_name: str = "unknown_format",
+    prompt: str | None = None,
 ) -> str:
     """Build a prompt requesting a FormatConfig for the given file.
 
@@ -130,6 +131,10 @@ def build_prompt(
         for ex in example_configs:
             parts.append(ex.model_dump_json(indent=2))
 
+    # Additional user-provided context
+    if prompt:
+        parts.append(f"\n## Additional Context\n{prompt}")
+
     return "\n".join(parts)
 
 
@@ -141,6 +146,7 @@ def generate_config(
     format_name: str | None = None,
     max_retries: int = 2,
     n_sample_rows: int = 15,
+    prompt: str | None = None,
 ) -> FormatConfig:
     """Generate a FormatConfig for the given file using the LangChain agent API.
 
@@ -174,7 +180,9 @@ def generate_config(
 
     df: pl.DataFrame = read_file(path).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
-    prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name)
+    built_prompt = build_prompt(
+        df, target_schema, list(df.columns), example_configs, inferred_name, prompt=prompt
+    )
 
     # Side-channels: the tool captures its result and all attempt records here.
     result_box: list[FormatConfig] = []
@@ -235,7 +243,7 @@ def generate_config(
     agent = create_agent(llm, [submit_format_config])
     try:
         agent.invoke(
-            {"messages": [HumanMessage(content=prompt)]},
+            {"messages": [HumanMessage(content=built_prompt)]},
             config={"recursion_limit": recursion_limit},
         )
     except Exception as exc:
