@@ -153,7 +153,7 @@ def generate(  # noqa: PLR0913
             llm=llm,
             format_name=name,
             n_sample_rows=rows,
-            prompt=prompt,
+            user_prompt=prompt,
         )
 
         if interactive:

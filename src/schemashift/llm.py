@@ -74,7 +74,7 @@ def build_prompt(
     file_columns: list[str],
     example_configs: list[FormatConfig] | None = None,
     format_name: str = "unknown_format",
-    prompt: str | None = None,
+    user_prompt: str | None = None,
 ) -> str:
     """Build a prompt requesting a FormatConfig for the given file.
 
@@ -84,7 +84,7 @@ def build_prompt(
         file_columns: Column names present in the source file.
         example_configs: Optional list of existing FormatConfigs to show as examples.
         format_name: Suggested name for the new format config.
-        prompt: Optional extra context appended to the prompt (e.g. unit
+        user_prompt: Optional extra context appended to the prompt (e.g. unit
             conventions, timestamp formats).
 
     Returns:
@@ -134,8 +134,8 @@ def build_prompt(
             parts.append(ex.model_dump_json(indent=2))
 
     # Additional user-provided context
-    if prompt:
-        parts.append(f"\n## Additional Context\n{prompt}")
+    if user_prompt:
+        parts.append(f"\n## Additional Context\n{user_prompt}")
 
     return "\n".join(parts)
 
@@ -148,7 +148,7 @@ def generate_config(
     format_name: str | None = None,
     max_retries: int = 2,
     n_sample_rows: int = 15,
-    prompt: str | None = None,
+    user_prompt: str | None = None,
 ) -> FormatConfig:
     """Generate a FormatConfig for the given file using the LangChain agent API.
 
@@ -165,7 +165,7 @@ def generate_config(
         format_name: Name for the generated config. Defaults to the file stem.
         max_retries: Number of additional attempts after the first failure.
         n_sample_rows: Number of rows to sample from the file for the prompt.
-        prompt: Optional extra context for the LLM (e.g. unit conventions,
+        user_prompt: Optional extra context for the LLM (e.g. unit conventions,
             timestamp formats).
 
     Returns:
@@ -184,7 +184,7 @@ def generate_config(
 
     df: pl.DataFrame = read_file(path).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
-    built_prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name, prompt=prompt)
+    prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name, user_prompt=user_prompt)
 
     # Side-channels: the tool captures its result and all attempt records here.
     result_box: list[FormatConfig] = []
@@ -245,7 +245,7 @@ def generate_config(
     agent = create_agent(llm, [submit_format_config])
     try:
         agent.invoke(
-            {"messages": [HumanMessage(content=built_prompt)]},
+            {"messages": [HumanMessage(content=prompt)]},
             config={"recursion_limit": recursion_limit},
         )
     except Exception as exc:
