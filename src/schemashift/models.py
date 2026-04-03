@@ -76,7 +76,7 @@ class ReaderConfig(BaseModel):
 
     skip_rows: int = Field(default=0, description="Number of rows to skip before the header.", ge=0)
     sheet_name: str | int | None = Field(
-        default=None, description="Excel sheet name (string) or 1-based index (int). Ignored for non-Excel files."
+        default=None, description="Excel sheet name (string) or 0-based index (int). Ignored for non-Excel files."
     )
     separator: str | None = Field(default=None, description="CSV field delimiter. Auto-detected when null.")
     encoding: str = Field(default="utf-8", description="Character encoding of the source file.")
