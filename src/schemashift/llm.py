@@ -22,6 +22,55 @@ _log = logging.getLogger(__name__)
 _DSL_REFERENCE = _dsl_module.__doc__ or ""
 
 
+def load_default_llm() -> Any:
+    """Load a LangChain LLM from environment variables.
+
+    Resolution order:
+
+    1. Azure AI Foundry — when ``FOUNDRY_API_KEY`` and ``FOUNDRY_RESOURCE`` are set.
+       Uses the Anthropic messages API at
+       ``https://{FOUNDRY_RESOURCE}.services.ai.azure.com/anthropic``.
+       ``MODEL_NAME`` selects the deployment (defaults to ``'claude-haiku-4-5'``).
+    2. Direct Anthropic — when ``ANTHROPIC_API_KEY`` is set.
+
+    Raises:
+        ImportError: When ``langchain-anthropic`` is not installed.
+        ValueError: When no recognised API key is found in the environment.
+    """
+    import os
+
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass  # python-dotenv optional; env vars may already be set
+
+    try:
+        from langchain_anthropic import ChatAnthropic
+    except ImportError as exc:
+        raise ImportError("langchain-anthropic is not installed. Run: pip install 'schemashift[llm]'") from exc
+
+    foundry_key = os.getenv("FOUNDRY_API_KEY")
+    foundry_resource = os.getenv("FOUNDRY_RESOURCE")
+    if foundry_key and foundry_resource:
+        model_name = os.getenv("MODEL_NAME", "claude-haiku-4-5")
+        return ChatAnthropic(
+            model=model_name,
+            api_key=foundry_key,
+            base_url=f"https://{foundry_resource}.services.ai.azure.com/anthropic",
+        )  # ty: ignore[missing-argument, unknown-argument]
+
+    if os.getenv("ANTHROPIC_API_KEY"):
+        return ChatAnthropic(
+            model="claude-haiku-4-5-20251001", temperature=0
+        )  # ty: ignore[missing-argument, unknown-argument]
+
+    raise ValueError(
+        "No LLM API key found. Set FOUNDRY_API_KEY + FOUNDRY_RESOURCE (Azure AI Foundry) or ANTHROPIC_API_KEY."
+    )
+
+
 def build_prompt(
     sample_df: pl.DataFrame,
     target_schema: TargetSchema,

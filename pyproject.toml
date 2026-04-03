@@ -36,6 +36,7 @@ llm = [
     "langchain-core>=1.2,<2",
     "langchain-anthropic>=1.4,<2",
     "python-dotenv>=1.2,<2",
+    "langchain>=1.2.14",
 ]
 dev = [
     "pytest>=9.0",
