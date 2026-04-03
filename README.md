@@ -85,11 +85,10 @@ from langchain_anthropic import ChatAnthropic
 llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
 # or via Azure AI Foundry:
-from langchain_azure_ai.chat_models import AzureAIChatCompletionsModel
-llm = AzureAIChatCompletionsModel(
-    endpoint="https://<resource>.services.ai.azure.com/api/projects/<project>",
-    credential="<FOUNDRY_API_KEY>",
-    model_name="claude-haiku-4-5",
+llm = ChatAnthropic(
+    model="claude-haiku-4-5",
+    api_key="<FOUNDRY_API_KEY>",
+    base_url="https://<resource>.services.ai.azure.com/anthropic",
 )
 
 result = ss.smart_transform(

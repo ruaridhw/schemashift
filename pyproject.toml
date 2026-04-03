@@ -35,7 +35,6 @@ docs = [
 llm = [
     "langchain-core>=1.2,<2",
     "langchain-anthropic>=1.4,<2",
-    "langchain-azure-ai>=1.2,<2",
     "python-dotenv>=1.2,<2",
 ]
 dev = [
