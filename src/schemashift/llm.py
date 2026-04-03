@@ -184,9 +184,7 @@ def generate_config(
 
     df: pl.DataFrame = read_file(path).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
-    built_prompt = build_prompt(
-        df, target_schema, list(df.columns), example_configs, inferred_name, prompt=prompt
-    )
+    built_prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name, prompt=prompt)
 
     # Side-channels: the tool captures its result and all attempt records here.
     result_box: list[FormatConfig] = []
