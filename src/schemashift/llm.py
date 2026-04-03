@@ -46,6 +46,9 @@ DSL Expression Reference:
   col("x").is_null()                       # boolean null check
   when(col("T") == "A", "Result A").otherwise("Other")                        # conditional
   when(col("T") == "A", "A").when(col("T") == "B", "B").otherwise("C")       # chained
+  lookup(col("Country"), "country_to_iso2")                                   # built-in table
+  custom_lookup(col("Status"), {"A": "Active", "B": "Inactive"})              # user-defined mapping
+  custom_lookup(col("Country"), {"Türkiye": "TR"}, "country_to_iso2")         # extend built-in table
 """
 
 

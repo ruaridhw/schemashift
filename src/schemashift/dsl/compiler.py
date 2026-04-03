@@ -15,7 +15,9 @@ from .ast_nodes import (
     BinaryOp,
     Coalesce,
     ColRef,
+    CustomLookup,
     Literal,
+    Lookup,
     MethodCall,
     UnaryOp,
     WhenChain,
@@ -131,6 +133,35 @@ def compile_dsl(node: ASTNode) -> pl.Expr:  # noqa: C901 (complex but intentiona
 
         case Coalesce(exprs):
             return pl.coalesce([compile_dsl(e) for e in exprs])
+
+        case Lookup(expr, table_name):
+            from schemashift.dsl._lookups import TABLES
+
+            if table_name not in TABLES:
+                raise DSLSyntaxError(
+                    f"Unknown lookup table: {table_name!r}. Available: {sorted(TABLES)!r}",
+                    expression="",
+                    position=-1,
+                )
+            table = TABLES[table_name]
+            return compile_dsl(expr).replace(list(table.keys()), list(table.values()))
+
+        case CustomLookup(expr, mapping, base_table):
+            from schemashift.dsl._lookups import TABLES
+
+            if base_table is not None:
+                if base_table not in TABLES:
+                    raise DSLSyntaxError(
+                        f"Unknown base table: {base_table!r}. Available: {sorted(TABLES)!r}",
+                        expression="",
+                        position=-1,
+                    )
+                combined: dict = dict(TABLES[base_table])
+            else:
+                combined = {}
+            for k, v in mapping:
+                combined[k.value] = v.value
+            return compile_dsl(expr).replace(list(combined.keys()), list(combined.values()))
 
         case _:
             raise DSLRuntimeError(f"Unknown AST node type: {type(node).__name__}")

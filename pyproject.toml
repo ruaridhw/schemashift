@@ -103,6 +103,9 @@ exclude = [".venv/"]
 min_confidence = 60
 paths = ["src/", "whitelist_vulture.py"]
 
+[tool.typos.files]
+extend-exclude = ["src/schemashift/dsl/tables/"]
+
 [tool.typos.default]
 locale = "en-gb"
 extend-ignore-re = ["(?Rm)^.*#\\s*ignore:typo$"]
