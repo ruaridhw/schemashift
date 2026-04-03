@@ -8,7 +8,7 @@ from langchain_core.language_models.fake_chat_models import FakeMessagesListChat
 from langchain_core.messages import AIMessage
 
 from schemashift.errors import LLMGenerationError
-from schemashift.llm import _extract_json, build_prompt, generate_config
+from schemashift.llm import build_prompt, generate_config
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.target_schema import TargetColumn, TargetSchema
 
@@ -23,24 +23,6 @@ class FakeToolCallingModel(FakeMessagesListChatModel):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
-
-
-class TestExtractJson:
-    def test_raw_json(self):
-        result = _extract_json('{"name": "test", "columns": []}')
-        assert result == '{"name": "test", "columns": []}'
-
-    def test_code_block(self):
-        text = 'Here:\n```json\n{"name": "t"}\n```'
-        assert '"name"' in _extract_json(text)
-
-    def test_json_with_surrounding_text(self):
-        text = 'Sure! {"name": "t", "columns": []} done.'
-        assert '"name"' in _extract_json(text)
-
-    def test_no_json_raises(self):
-        with pytest.raises(LLMGenerationError):
-            _extract_json("no json here at all")
 
 
 class TestBuildPrompt:

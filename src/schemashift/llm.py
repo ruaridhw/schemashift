@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from pathlib import Path
 from typing import Any
 
@@ -50,28 +49,6 @@ DSL Expression Reference:
   when(col("T") == "A", "Result A").otherwise("Other")                        # conditional
   when(col("T") == "A", "A").when(col("T") == "B", "B").otherwise("C")       # chained
 """
-
-_JSON_BLOCK_RE = re.compile(r"```json\s*\n(.*?)\n\s*```", re.DOTALL)
-_OUTERMOST_BRACES_RE = re.compile(r"\{.*\}", re.DOTALL)
-
-
-def _extract_json(text: str) -> str:
-    """Extract a JSON object string from text.
-
-    Tries three strategies in order:
-    1. A ```json...``` fenced code block.
-    2. The outermost ``{...}`` span in the text.
-    3. Raises :class:`~schemashift.errors.LLMGenerationError`.
-    """
-    m = _JSON_BLOCK_RE.search(text)
-    if m:
-        return m.group(1).strip()
-
-    m = _OUTERMOST_BRACES_RE.search(text)
-    if m:
-        return m.group(0).strip()
-
-    raise LLMGenerationError("No JSON found in LLM response")
 
 
 def build_prompt(
@@ -142,11 +119,11 @@ def build_prompt(
 def generate_config(
     path: str,
     target_schema: TargetSchema,
-    llm: Any,
+    llm: Any,  # ANNOT: use stronger typing
     example_configs: list[FormatConfig] | None = None,
     format_name: str | None = None,
     max_retries: int = 2,
-    sample_rows: int = 15,
+    sample_rows: int = 15,  # ANNOT: rename this everywhere to `n_sample_rows`
 ) -> FormatConfig:
     """Generate a FormatConfig for the given file using the LangChain agent API.
 
