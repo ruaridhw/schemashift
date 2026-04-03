@@ -2,10 +2,13 @@
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 from pydantic import ValidationError
+
+if TYPE_CHECKING:
+    from langchain_core.language_models import BaseChatModel
 
 from . import dsl as _dsl_module
 from .errors import LLMGenerationError
@@ -143,7 +146,7 @@ def build_prompt(
 def generate_config(
     path: str,
     target_schema: TargetSchema,
-    llm: Any,  # ANNOT: use stronger typing
+    llm: "BaseChatModel",
     example_configs: list[FormatConfig] | None = None,
     format_name: str | None = None,
     max_retries: int = 2,

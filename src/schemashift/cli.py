@@ -68,7 +68,7 @@ def validate(config_path: Path) -> None:
     """Validate a format config file."""
     try:
         fmt_config = _load_format_config(config_path)
-    except (ConfigValidationError, Exception) as exc:
+    except Exception as exc:
         click.echo(f"Config load error: {exc}", err=True)
         sys.exit(1)
 
@@ -133,8 +133,8 @@ def generate(  # noqa: PLR0913
 ) -> None:
     """Generate a FormatConfig for an unknown file using an LLM.
 
-    Requires ANTHROPIC_API_KEY or OPENAI_API_KEY in environment,
-    or configure your LLM via environment variables.
+    Requires ANTHROPIC_API_KEY (direct) or FOUNDRY_API_KEY + FOUNDRY_RESOURCE
+    (Azure AI Foundry) to be set in the environment.
     """
     try:
         from schemashift.llm import generate_config
