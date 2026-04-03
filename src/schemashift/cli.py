@@ -145,7 +145,7 @@ def generate(  # noqa: PLR0913
             target_schema=schema,
             llm=llm,
             format_name=name,
-            sample_rows=rows,
+            n_sample_rows=rows,
         )
 
         if interactive:

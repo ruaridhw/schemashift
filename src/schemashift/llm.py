@@ -143,7 +143,7 @@ def generate_config(
     example_configs: list[FormatConfig] | None = None,
     format_name: str | None = None,
     max_retries: int = 2,
-    sample_rows: int = 15,  # ANNOT: rename this everywhere to `n_sample_rows`
+    n_sample_rows: int = 15,
 ) -> FormatConfig:
     """Generate a FormatConfig for the given file using the LangChain agent API.
 
@@ -159,7 +159,7 @@ def generate_config(
         example_configs: Optional existing FormatConfigs to include as examples.
         format_name: Name for the generated config. Defaults to the file stem.
         max_retries: Number of additional attempts after the first failure.
-        sample_rows: Number of rows to sample from the file for the prompt.
+        n_sample_rows: Number of rows to sample from the file for the prompt.
 
     Returns:
         A validated :class:`~schemashift.models.FormatConfig`.
@@ -168,7 +168,7 @@ def generate_config(
         LLMGenerationError: When the agent fails to produce a valid config.
             ``error.attempts`` contains per-attempt details.
     """
-    df: pl.DataFrame = read_file(path).head(sample_rows).collect()  # ty: ignore[invalid-assignment]
+    df: pl.DataFrame = read_file(path).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
     prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name)
 
