@@ -254,7 +254,9 @@ class TestStringMethods:
 
     def test_str_starts_with(self) -> None:
         df = pl.DataFrame({"X": ["hello", "world", "help"]})
-        result = df.select(parse_and_compile('col("X").str.starts_with("hel")').alias("out"))["out"].to_list()
+        result = df.select(parse_and_compile('col("X").str.starts_with("hel")').alias("out"))[  # ignore:typo
+            "out"
+        ].to_list()
         assert result == [True, False, True]
 
     def test_str_ends_with(self) -> None:

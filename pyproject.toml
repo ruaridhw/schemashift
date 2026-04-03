@@ -87,6 +87,10 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
+[tool.typos.default]
+locale = "en-gb"
+extend-ignore-re = ["(?Rm)^.*#\\s*ignore:typo$"]
+
 [dependency-groups]
 dev = [
     "openpyxl>=3.1",
