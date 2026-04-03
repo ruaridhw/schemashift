@@ -4,7 +4,7 @@ import polars as pl
 import pytest
 
 from schemashift.dsl import parse_and_compile
-from schemashift.dsl.ast_nodes import BinaryOp, ColRef, Literal, WhenClause
+from schemashift.dsl.ast_nodes import BinaryOp, ColRef, CustomLookup, Literal, Lookup, WhenClause
 from schemashift.dsl.compiler import compile_dsl
 from schemashift.errors import DSLRuntimeError, DSLSyntaxError
 
@@ -487,3 +487,69 @@ class TestCoalesce:
         df = pl.DataFrame({"name": ["a.b", "c.d"]})
         result = df.select(parse_and_compile('col("name").str.replace(".", "W")').alias("out"))["out"].to_list()
         assert result == ["aWb", "cWd"]
+
+
+# ---------------------------------------------------------------------------
+# Lookup
+# ---------------------------------------------------------------------------
+
+
+class TestLookup:
+    def test_country_to_iso2(self) -> None:
+        df = pl.DataFrame({"Country": ["United Kingdom", "France", "Nonexistent"]})
+        result = df.select(parse_and_compile('lookup(col("Country"), "country_to_iso2")').alias("out"))["out"].to_list()
+        assert result == ["GB", "FR", "Nonexistent"]
+
+    def test_unknown_table_raises(self) -> None:
+        with pytest.raises(DSLSyntaxError, match="Unknown lookup table"):
+            compile_dsl(Lookup(ColRef("X"), "nonexistent"))
+
+
+# ---------------------------------------------------------------------------
+# CustomLookup
+# ---------------------------------------------------------------------------
+
+
+class TestCustomLookup:
+    def test_string_to_string(self) -> None:
+        df = pl.DataFrame({"X": ["A", "B", "C"]})
+        result = df.select(parse_and_compile('custom_lookup(col("X"), {"A": "Active", "B": "Inactive"})').alias("out"))[
+            "out"
+        ].to_list()
+        assert result == ["Active", "Inactive", "C"]
+
+    def test_numeric_key_to_string(self) -> None:
+        df = pl.DataFrame({"X": ["1", "2", "3"]})
+        result = df.select(
+            compile_dsl(
+                CustomLookup(
+                    ColRef("X"),
+                    ((Literal("1"), Literal("One")), (Literal("2"), Literal("Two"))),
+                )
+            ).alias("out")
+        )["out"].to_list()
+        assert result == ["One", "Two", "3"]
+
+    def test_bool_values(self) -> None:
+        df = pl.DataFrame({"X": ["Y", "N", "Y"]})
+        result = df.select(parse_and_compile('custom_lookup(col("X"), {"Y": "yes", "N": "no"})').alias("out"))[
+            "out"
+        ].to_list()
+        assert result == ["yes", "no", "yes"]
+
+    def test_with_base_table_extends(self) -> None:
+        df = pl.DataFrame({"Country": ["United Kingdom", "Türkiye"]})
+        result = df.select(
+            parse_and_compile('custom_lookup(col("Country"), {"Türkiye": "TR"}, "country_to_iso2")').alias("out")
+        )["out"].to_list()
+        assert result == ["GB", "TR"]
+
+    def test_unknown_base_table_raises(self) -> None:
+        with pytest.raises(DSLSyntaxError, match="Unknown base table"):
+            compile_dsl(
+                CustomLookup(
+                    ColRef("X"),
+                    ((Literal("a"), Literal("b")),),
+                    "nonexistent",
+                )
+            )

@@ -72,5 +72,22 @@ class Coalesce:
     exprs: tuple["ASTNode", ...]
 
 
+@dataclass(frozen=True)
+class Lookup:
+    """Map column values through a named built-in lookup table."""
+
+    expr: "ASTNode"
+    table_name: str  # e.g. "country_to_iso2"
+
+
+@dataclass(frozen=True)
+class CustomLookup:
+    """Map column values through a user-defined dict, optionally extending a named table."""
+
+    expr: "ASTNode"
+    mapping: tuple[tuple[Literal, Literal], ...]
+    base_table: str | None = None  # named table to extend (custom entries override)
+
+
 # Type alias covering every node variant.
-ASTNode = Literal | ColRef | BinaryOp | UnaryOp | MethodCall | WhenClause | WhenChain | Coalesce
+ASTNode = Literal | ColRef | BinaryOp | UnaryOp | MethodCall | WhenClause | WhenChain | Coalesce | Lookup | CustomLookup

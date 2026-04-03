@@ -17,7 +17,9 @@ from .ast_nodes import (
     BinaryOp,
     Coalesce,
     ColRef,
+    CustomLookup,
     Literal,
+    Lookup,
     MethodCall,
     UnaryOp,
     WhenChain,
@@ -90,6 +92,9 @@ class TT(Enum):
     LE = auto()  # <=
     AMP = auto()  # &
     PIPE = auto()  # |
+    LBRACE = auto()  # {
+    RBRACE = auto()  # }
+    COLON = auto()  # :
     EOF = auto()
 
 
@@ -123,6 +128,9 @@ _TOKEN_RE = re.compile(
     |(?P<PERCENT> %)
     |(?P<AMP>    &)
     |(?P<PIPE>   \|)
+    |(?P<LBRACE>  \{)
+    |(?P<RBRACE>  \})
+    |(?P<COLON>   :)
     |(?P<WS>    \s+)                    # ignored whitespace
     """,
     re.VERBOSE,
@@ -146,6 +154,9 @@ _TT_MAP: dict[str, TT] = {
     "PERCENT": TT.PERCENT,
     "AMP": TT.AMP,
     "PIPE": TT.PIPE,
+    "LBRACE": TT.LBRACE,
+    "RBRACE": TT.RBRACE,
+    "COLON": TT.COLON,
     "IDENT": TT.IDENT,
 }
 
@@ -197,7 +208,9 @@ def tokenize(expression: str) -> list[Token]:
 # Parser
 # ---------------------------------------------------------------------------
 
-_KEYWORDS: frozenset[str] = frozenset({"col", "when", "otherwise", "true", "false", "null", "coalesce"})
+_KEYWORDS: frozenset[str] = frozenset(
+    {"col", "when", "otherwise", "true", "false", "null", "coalesce", "lookup", "custom_lookup"}
+)
 
 
 class _Parser:
@@ -374,6 +387,10 @@ class _Parser:
                 return self._when_expr()
             if ident == "coalesce":
                 return self._coalesce_expr()
+            if ident == "lookup":
+                return self._lookup_expr()
+            if ident == "custom_lookup":
+                return self._custom_lookup_expr()
             # Unknown identifier
             raise DSLSyntaxError(
                 f"Unknown identifier {ident!r}",
@@ -463,6 +480,76 @@ class _Parser:
                 position=self._current_pos(),
             )
         return Coalesce(tuple(exprs))
+
+    # lookup := 'lookup' '(' expression ',' STRING ')'
+    def _lookup_expr(self) -> Lookup:
+        self._expect(TT.IDENT, hint="Expected 'lookup'")
+        self._expect(TT.LPAREN, hint="Expected '(' after 'lookup'")
+        expr = self._expression()
+        self._expect(TT.COMMA, hint="Expected ',' after expression in lookup()")
+        table_tok = self._expect(TT.STRING, hint="lookup() table name must be a string literal")
+        self._expect(TT.RPAREN, hint="Expected ')' to close 'lookup(...'")
+        return Lookup(expr, str(table_tok.value))
+
+    # custom_lookup := 'custom_lookup' '(' expression ',' map_literal (',' STRING)? ')'
+    def _custom_lookup_expr(self) -> CustomLookup:
+        self._expect(TT.IDENT, hint="Expected 'custom_lookup'")
+        self._expect(TT.LPAREN, hint="Expected '(' after 'custom_lookup'")
+        expr = self._expression()
+        self._expect(TT.COMMA, hint="Expected ',' after expression in custom_lookup()")
+        mapping = self._map_literal()
+        if not mapping:
+            raise DSLSyntaxError(
+                "custom_lookup() mapping must not be empty",
+                expression=self._expr,
+                position=self._current_pos(),
+            )
+        # Optional: , "base_table_name"
+        base_table: str | None = None
+        if self._match(TT.COMMA):
+            self._advance()
+            tbl_tok = self._expect(TT.STRING, hint="custom_lookup() base table name must be a string literal")
+            base_table = str(tbl_tok.value)
+        self._expect(TT.RPAREN, hint="Expected ')' to close 'custom_lookup(...'")
+        return CustomLookup(expr, mapping, base_table)
+
+    # map_literal := '{' (literal ':' literal (',' literal ':' literal)* ','?)? '}'
+    def _map_literal(self) -> tuple[tuple[Literal, Literal], ...]:
+        self._expect(TT.LBRACE, hint="Expected '{' to start mapping")
+        pairs: list[tuple[Literal, Literal]] = []
+        while not self._match(TT.RBRACE):
+            if pairs:
+                self._expect(TT.COMMA, hint="Expected ',' between mapping entries")
+            if self._match(TT.RBRACE):  # trailing comma
+                break
+            key = self._literal_atom()
+            self._expect(TT.COLON, hint="Expected ':' between key and value")
+            val = self._literal_atom()
+            pairs.append((key, val))
+        self._expect(TT.RBRACE, hint="Expected '}' to close mapping")
+        return tuple(pairs)
+
+    def _literal_atom(self) -> Literal:
+        """Parse a scalar literal (string, number, bool, null) for map keys/values."""
+        tok = self._peek()
+        if tok.type == TT.NUMBER:
+            self._advance()
+            return Literal(tok.value)
+        if tok.type == TT.STRING:
+            self._advance()
+            return Literal(tok.value)
+        if tok.type == TT.IDENT and str(tok.value) in ("true", "false", "null"):
+            self._advance()
+            if str(tok.value) == "true":
+                return Literal(True)
+            if str(tok.value) == "false":
+                return Literal(False)
+            return Literal(None)
+        raise DSLSyntaxError(
+            f"Expected a literal value (string, number, true, false, null), got {tok.value!r}",
+            expression=self._expr,
+            position=tok.pos,
+        )
 
     # args := expression (',' expression)*
     def _args(self) -> list[ASTNode]:

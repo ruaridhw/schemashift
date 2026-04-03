@@ -6,7 +6,9 @@ from schemashift.dsl.ast_nodes import (
     BinaryOp,
     Coalesce,
     ColRef,
+    CustomLookup,
     Literal,
+    Lookup,
     MethodCall,
     UnaryOp,
     WhenChain,
@@ -518,3 +520,72 @@ class TestCoalesce:
     def test_one_arg_raises_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError, match="at least 2"):
             parse_dsl('coalesce(col("a"))')
+
+
+# ---------------------------------------------------------------------------
+# Lookup
+# ---------------------------------------------------------------------------
+
+
+class TestLookup:
+    def test_basic(self) -> None:
+        result = parse_dsl('lookup(col("Country"), "country_to_iso2")')
+        assert result == Lookup(ColRef("Country"), "country_to_iso2")
+
+    def test_expression_as_arg(self) -> None:
+        result = parse_dsl('lookup(col("Country").str.lower(), "country_to_iso2")')
+        assert result == Lookup(
+            MethodCall(ColRef("Country"), "str.lower", ()),
+            "country_to_iso2",
+        )
+
+    def test_non_string_table_name_raises(self) -> None:
+        with pytest.raises(DSLSyntaxError, match="string literal"):
+            parse_dsl('lookup(col("X"), 123)')
+
+
+# ---------------------------------------------------------------------------
+# CustomLookup
+# ---------------------------------------------------------------------------
+
+
+class TestCustomLookup:
+    def test_basic_string_mapping(self) -> None:
+        result = parse_dsl('custom_lookup(col("Status"), {"A": "Active", "B": "Inactive"})')
+        assert result == CustomLookup(
+            ColRef("Status"),
+            ((Literal("A"), Literal("Active")), (Literal("B"), Literal("Inactive"))),
+        )
+
+    def test_numeric_keys(self) -> None:
+        result = parse_dsl('custom_lookup(col("Code"), {1: "One", 2: "Two"})')
+        assert result == CustomLookup(
+            ColRef("Code"),
+            ((Literal(1), Literal("One")), (Literal(2), Literal("Two"))),
+        )
+
+    def test_trailing_comma(self) -> None:
+        result = parse_dsl('custom_lookup(col("X"), {"A": "B",})')
+        assert result == CustomLookup(
+            ColRef("X"),
+            ((Literal("A"), Literal("B")),),
+        )
+
+    def test_null_value(self) -> None:
+        result = parse_dsl('custom_lookup(col("X"), {"A": null})')
+        assert result == CustomLookup(
+            ColRef("X"),
+            ((Literal("A"), Literal(None)),),
+        )
+
+    def test_empty_mapping_raises(self) -> None:
+        with pytest.raises(DSLSyntaxError, match="must not be empty"):
+            parse_dsl('custom_lookup(col("X"), {})')
+
+    def test_with_base_table(self) -> None:
+        result = parse_dsl('custom_lookup(col("X"), {"extra": "EX"}, "country_to_iso2")')
+        assert result == CustomLookup(
+            ColRef("X"),
+            ((Literal("extra"), Literal("EX")),),
+            "country_to_iso2",
+        )
