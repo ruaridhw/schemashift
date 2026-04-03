@@ -48,13 +48,11 @@ def transform(file: str, config: Path | None, registry: str | None, output: str 
         else:
             raise click.UsageError("Provide either --config or --registry.")
 
-        df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
-
         if output is not None:
-            _write_output(df, output)
-            click.echo(f"Written {len(df)} rows to '{output}'.")
+            _sink_output(lf, output)
+            click.echo(f"Written to '{output}'.")
         else:
-            click.echo(str(df.head(20)))
+            click.echo(str(lf.head(20).collect()))
 
     except (FormatDetectionError, AmbiguousFormatError, ConfigValidationError, ReviewRejectedError) as exc:
         click.echo(f"Error: {exc}", err=True)
@@ -268,15 +266,15 @@ def _load_format_config(path: Path) -> FormatConfig:
     return FormatConfig.model_validate(data)
 
 
-def _write_output(df: pl.DataFrame, output: str) -> None:
-    """Write a DataFrame to the given path based on its file extension."""
+def _sink_output(lf: pl.LazyFrame, output: str) -> None:
+    """Stream a LazyFrame to a file using Polars sink methods where available."""
     out_path = Path(output)
     ext = out_path.suffix.lower()
     if ext == ".csv":
-        df.write_csv(output)
+        lf.sink_csv(out_path)
     elif ext == ".parquet":
-        df.write_parquet(output)
+        lf.sink_parquet(out_path)
     elif ext == ".json":
-        df.write_json(output)
+        lf.collect().write_json(out_path)
     else:
         raise click.UsageError(f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json.")
