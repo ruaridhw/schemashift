@@ -1,10 +1,12 @@
 """Format config registries — in-memory and file-system backed."""
 
 import json
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from schemashift.errors import ConfigValidationError
 from schemashift.models import FormatConfig
 
 if TYPE_CHECKING:
@@ -67,6 +69,10 @@ class FileSystemRegistry(Registry):
         self._path.mkdir(parents=True, exist_ok=True)
 
     def _config_path(self, name: str) -> Path:
+        if not re.fullmatch(r"[A-Za-z0-9_\-]+", name):
+            raise ConfigValidationError(
+                f"Invalid config name {name!r}: only letters, digits, underscores, and hyphens are allowed."
+            )
         return self._path / f"{name}.json"
 
     def get(self, name: str) -> FormatConfig | None:

@@ -3,6 +3,9 @@
 import json
 from pathlib import Path
 
+import pytest
+
+from schemashift.errors import ConfigValidationError
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.registry import DictRegistry, FileSystemRegistry
 
@@ -247,3 +250,17 @@ class TestFileSystemRegistryLoadSchema:
     def test_returns_none_when_named_schema_and_no_schemas_dir(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
         assert reg.load_schema("any_name") is None
+
+    def test_path_traversal_rejected(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        with pytest.raises(ConfigValidationError):
+            reg.get("../evil")
+
+    def test_dotfile_name_rejected(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        with pytest.raises(ConfigValidationError):
+            reg.get(".hidden")
+
+    def test_hyphenated_name_accepted(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        assert reg.get("my-config") is None
