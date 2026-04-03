@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import polars as pl
 
+from schemashift.dtypes import DTYPE_MAP
 from schemashift.errors import DSLRuntimeError, DSLSyntaxError
 
 from .ast_nodes import (
@@ -22,32 +23,6 @@ from .ast_nodes import (
     WhenChain,
     WhenClause,
 )
-
-# ---------------------------------------------------------------------------
-# Type mapping for cast()
-# ---------------------------------------------------------------------------
-
-_CAST_TYPES: dict[str, type[pl.DataType]] = {
-    "str": pl.Utf8,
-    "utf8": pl.Utf8,
-    "string": pl.Utf8,
-    "float32": pl.Float32,
-    "float64": pl.Float64,
-    "int8": pl.Int8,
-    "int16": pl.Int16,
-    "int32": pl.Int32,
-    "int64": pl.Int64,
-    "uint8": pl.UInt8,
-    "uint16": pl.UInt16,
-    "uint32": pl.UInt32,
-    "uint64": pl.UInt64,
-    "bool": pl.Boolean,
-    "boolean": pl.Boolean,
-    "date": pl.Date,
-    "datetime": pl.Datetime,
-    "time": pl.Time,
-    "duration": pl.Duration,
-}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -187,13 +162,13 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
         case "cast":
             _expect_arity(method, args, 1)
             type_str = _literal_str(args[0], method).lower()
-            if type_str not in _CAST_TYPES:
+            if type_str not in DTYPE_MAP:
                 raise DSLSyntaxError(
-                    f"Unknown cast type: {type_str!r}. Valid types: {sorted(_CAST_TYPES)!r}",
+                    f"Unknown cast type: {type_str!r}. Valid types: {sorted(DTYPE_MAP)!r}",
                     expression="",
                     position=-1,
                 )
-            return base.cast(_CAST_TYPES[type_str])
+            return base.cast(DTYPE_MAP[type_str])
 
         case "fill_null":
             _expect_arity(method, args, 1)

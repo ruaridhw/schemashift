@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import polars as pl
 
 from schemashift.dsl import parse_and_compile
+from schemashift.dtypes import DTYPE_MAP
 from schemashift.errors import DSLRuntimeError, DSLSyntaxError, FormatDetectionError
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.readers import read_file
@@ -16,34 +17,6 @@ from schemashift.registry import Registry
 
 if TYPE_CHECKING:
     from schemashift.target_schema import TargetSchema
-
-# ---------------------------------------------------------------------------
-# Dtype mapping
-# ---------------------------------------------------------------------------
-
-DTYPE_MAP: dict[str, type[pl.DataType]] = {
-    "str": pl.Utf8,
-    "string": pl.Utf8,
-    "utf8": pl.Utf8,
-    "int8": pl.Int8,
-    "int16": pl.Int16,
-    "int32": pl.Int32,
-    "int64": pl.Int64,
-    "uint8": pl.UInt8,
-    "uint16": pl.UInt16,
-    "uint32": pl.UInt32,
-    "uint64": pl.UInt64,
-    "float32": pl.Float32,
-    "float64": pl.Float64,
-    "bool": pl.Boolean,
-    "boolean": pl.Boolean,
-    "datetime": pl.Datetime,
-    "date": pl.Date,
-    "time": pl.Time,
-    "duration": pl.Duration,
-    "binary": pl.Binary,
-    "categorical": pl.Categorical,
-}
 
 
 # ---------------------------------------------------------------------------
@@ -82,9 +55,9 @@ def transform(
     lf = read_file(path, effective_reader)
     expressions = _build_expressions(config)
 
-    lf = lf.select(expressions) if config.drop_unmapped else lf.with_columns(expressions)
-
-    return lf
+    if config.drop_unmapped:
+        return lf.select(expressions)
+    return lf.with_columns(expressions)
 
 
 def validate_config(config: FormatConfig) -> list[str]:
@@ -169,7 +142,7 @@ def smart_transform(
     path: str | Path,
     registry: Registry,
     target_schema: TargetSchema | None = None,
-    llm: Any = None,
+    llm: Any = None,  # ANNOT: the typing here should be stronger
     review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
     auto_register: bool = False,
     example_configs: list[FormatConfig] | None = None,

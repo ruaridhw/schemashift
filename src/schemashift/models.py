@@ -7,32 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .dtypes import DTYPE_MAP
 from .errors import ConfigValidationError
-
-_VALID_DTYPES: frozenset[str] = frozenset(
-    {
-        "str",
-        "utf8",
-        "float32",
-        "float64",
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "uint8",
-        "uint16",
-        "uint32",
-        "uint64",
-        "bool",
-        "date",
-        "datetime",
-        "time",
-        "duration",
-        "binary",
-        "categorical",
-        "null",
-    }
-)
 
 # Matches col("column_name") in DSL expressions.
 _COL_PATTERN: re.Pattern[str] = re.compile(r'col\("([^"]+)"\)')
@@ -69,8 +45,8 @@ class ColumnMapping(BaseModel):
     @field_validator("dtype")
     @classmethod
     def _validate_dtype(cls, value: str | None) -> str | None:
-        if value is not None and value not in _VALID_DTYPES:
-            raise ConfigValidationError(f"Invalid dtype '{value}'. Valid values are: {sorted(_VALID_DTYPES)}")
+        if value is not None and value not in DTYPE_MAP:
+            raise ConfigValidationError(f"Invalid dtype '{value}'. Valid values are: {sorted(DTYPE_MAP)}")
         return value
 
 
