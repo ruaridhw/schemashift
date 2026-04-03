@@ -410,6 +410,11 @@ class TestLogicalCompiled:
         result = df.select(parse_and_compile('col("X") == 1 | col("X") == 10').alias("out"))["out"].to_list()
         assert result == [True, False, True]
 
+    def test_logical_not(self) -> None:
+        df = pl.DataFrame({"flag": [True, False, True]})
+        result = df.select(parse_and_compile('not col("flag")').alias("out"))["out"].to_list()
+        assert result == [False, True, False]
+
 
 # ---------------------------------------------------------------------------
 # Datetime hour/minute/second/timestamp compiled
