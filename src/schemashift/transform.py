@@ -256,8 +256,8 @@ def _mapping_to_expr(mapping: ColumnMapping) -> pl.Expr:
                 target=mapping.target,
             ) from exc
         expr = compiled.alias(mapping.target)
-    elif mapping.constant is not None:
-        # constant
+    elif mapping.has_constant():
+        # constant (may be None, broadcasting nulls)
         expr = pl.lit(mapping.constant).alias(mapping.target)
     else:
         raise ValueError(f"ColumnMapping {mapping} has neither source nor expr nor constant")
@@ -269,7 +269,7 @@ def _mapping_to_expr(mapping: ColumnMapping) -> pl.Expr:
             expr = expr.cast(dtype)
 
     # Apply fill_null
-    if mapping.fillna is not None:
+    if mapping.has_fillna():
         expr = expr.fill_null(pl.lit(mapping.fillna))
 
     return expr
