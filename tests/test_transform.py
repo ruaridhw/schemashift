@@ -6,7 +6,7 @@ import polars as pl
 import pytest
 
 from schemashift.errors import AmbiguousFormatError, FormatDetectionError
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.registry import DictRegistry
 from schemashift.transform import auto_transform, dry_run, transform, validate_config
 
@@ -332,3 +332,17 @@ class TestAutoTransform:
 
         with pytest.raises(AmbiguousFormatError):
             auto_transform(SAMPLE_CSV, reg)
+
+    def test_auto_transform_forwards_reader_config(self, tmp_path: Path) -> None:
+        csv = tmp_path / "data.csv"
+        csv.write_text("metadata\na,b\n1,2\n")
+        config = FormatConfig(
+            name="test",
+            reader=ReaderConfig(skip_rows=1),
+            columns=[ColumnMapping(target="a", source="a"), ColumnMapping(target="b", source="b")],
+        )
+        reg = DictRegistry()
+        reg.register(config)
+        result = auto_transform(str(csv), reg, reader_config=ReaderConfig(skip_rows=1)).collect()
+        assert list(result.columns) == ["a", "b"]
+        assert result.shape == (1, 2)
