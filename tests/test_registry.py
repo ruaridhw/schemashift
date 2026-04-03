@@ -264,3 +264,9 @@ class TestFileSystemRegistryLoadSchema:
     def test_hyphenated_name_accepted(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
         assert reg.get("my-config") is None
+
+    def test_list_configs_corrupt_file_raises_with_path(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        (tmp_path / "bad.json").write_text("{invalid json", encoding="utf-8")
+        with pytest.raises(ConfigValidationError, match="bad.json"):
+            reg.list_configs()
