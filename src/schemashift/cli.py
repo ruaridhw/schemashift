@@ -237,9 +237,10 @@ def _load_default_llm() -> Any:
     """Load a LangChain LLM from environment variables.
 
     Resolution order:
-    1. Azure AI Foundry — when FOUNDRY_API_KEY is set alongside FOUNDRY_ENDPOINT
-       or FOUNDRY_RESOURCE (e.g. 'parsnip-resource'). MODEL_NAME selects the
-       deployment (defaults to 'claude-haiku-4-5').
+    1. Azure AI Foundry — when FOUNDRY_API_KEY and FOUNDRY_RESOURCE are set.
+       Uses the Anthropic messages API at
+       ``https://{FOUNDRY_RESOURCE}.services.ai.azure.com/anthropic``.
+       MODEL_NAME selects the deployment (defaults to 'claude-haiku-4-5').
     2. Anthropic — when ANTHROPIC_API_KEY is set.
     """
     import os
@@ -252,22 +253,18 @@ def _load_default_llm() -> Any:
         pass  # python-dotenv optional; env vars may already be set
 
     foundry_key = os.getenv("FOUNDRY_API_KEY")
-    foundry_endpoint = os.getenv("FOUNDRY_ENDPOINT")
     foundry_resource = os.getenv("FOUNDRY_RESOURCE")
-    if foundry_key and (foundry_endpoint or foundry_resource):
+    if foundry_key and foundry_resource:
         try:
-            from langchain_azure_ai.chat_models import AzureAIChatCompletionsModel
+            from langchain_anthropic import ChatAnthropic
         except ImportError as exc:
-            raise click.ClickException("langchain-azure-ai is not installed. Run: uv add 'schemashift[llm]'") from exc
-        endpoint = (
-            foundry_endpoint or f"https://{foundry_resource}.services.ai.azure.com/api/projects/{foundry_resource}"
-        )
+            raise click.ClickException("langchain-anthropic is not installed. Run: uv add 'schemashift[llm]'") from exc
         model_name = os.getenv("MODEL_NAME", "claude-haiku-4-5")
-        return AzureAIChatCompletionsModel(
-            endpoint=endpoint,
-            credential=foundry_key,
-            model_name=model_name,
-        )
+        return ChatAnthropic(
+            model=model_name,
+            api_key=foundry_key,
+            base_url=f"https://{foundry_resource}.services.ai.azure.com/anthropic",
+        )  # ty: ignore[missing-argument, unknown-argument]
 
     if os.getenv("ANTHROPIC_API_KEY"):
         try:
