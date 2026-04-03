@@ -1,7 +1,5 @@
 """Tests for Excel reading edge cases."""
 
-from __future__ import annotations
-
 import pytest
 
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig

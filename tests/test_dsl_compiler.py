@@ -1,7 +1,5 @@
 """Tests for the DSL compiler — parse_and_compile against real Polars DataFrames."""
 
-from __future__ import annotations
-
 import polars as pl
 import pytest
 

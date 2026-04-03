@@ -4,8 +4,6 @@ Usage:
     uv run python tests/fixtures/semicon/generate.py
 """
 
-from __future__ import annotations
-
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -263,12 +261,12 @@ def gen_sap():
 
 
 # ---------------------------------------------------------------------------
-# File 4: Promis legacy — UTF-8 BOM, French headers, type flip, mixed nulls
+# File 4: Promise legacy — UTF-8 BOM, French headers, type flip, mixed nulls
 # Gotchas: 6, 5, 2, 8, 12
 # ---------------------------------------------------------------------------
 
 
-def gen_promis():
+def gen_promise():
     header = (
         "Lot_Réf,Nb_Plaques,Opération,Séquence,Équipement,Heure_Entrée,Heure_Sortie,Recette,Parcours,Priorité,Blocage"
     )
@@ -303,8 +301,8 @@ def gen_promis():
 
     content = header + "\n" + "\n".join(rows) + "\n"
     bom = b"\xef\xbb\xbf"
-    (SOURCES / "promis_legacy.csv").write_bytes(bom + content.encode("utf-8"))
-    print("  promis_legacy.csv")
+    (SOURCES / "promise_legacy.csv").write_bytes(bom + content.encode("utf-8"))
+    print("  promise_legacy.csv")
 
 
 # ---------------------------------------------------------------------------
@@ -786,7 +784,7 @@ def main():
     gen_camstar()
     gen_fabx()
     gen_sap()
-    gen_promis()
+    gen_promise()
     gen_infinityqs()
     gen_factorytalk()
     gen_amhs()

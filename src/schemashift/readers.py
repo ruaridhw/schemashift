@@ -1,7 +1,5 @@
 """File readers that return Polars LazyFrames."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import polars as pl
@@ -75,7 +73,7 @@ def read_header(path: str | Path, config: ReaderConfig | None = None) -> list[st
 # ---------------------------------------------------------------------------
 
 
-def _normalize_csv_encoding(encoding: str) -> str:
+def _normalise_csv_encoding(encoding: str) -> str:
     """Normalise encoding strings for Polars scan_csv.
 
     Polars scan_csv only accepts 'utf8' or 'utf8-lossy'.  Common aliases like
@@ -91,7 +89,7 @@ def _read_csv(path: Path, cfg: ReaderConfig, default_sep: str) -> pl.LazyFrame:
         path,
         separator=sep,
         skip_rows=cfg.skip_rows,
-        encoding=_normalize_csv_encoding(cfg.encoding),  # ty: ignore[invalid-argument-type]
+        encoding=_normalise_csv_encoding(cfg.encoding),  # ty: ignore[invalid-argument-type]
     )
 
 

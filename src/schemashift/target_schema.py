@@ -1,7 +1,5 @@
 """Target schema definitions and validation helpers."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import polars as pl
@@ -33,7 +31,7 @@ class TargetSchema(BaseModel):
     columns: list[TargetColumn] = Field(description="Ordered list of expected output columns.")
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> TargetSchema:
+    def from_yaml(cls, path: str | Path) -> "TargetSchema":
         """Load a TargetSchema from a YAML file."""
         data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         return cls.model_validate(data)

@@ -4,8 +4,6 @@ Verifies that the DSL is a closed language — it cannot call arbitrary Python,
 access the file system, or produce anything other than a polars.Expr.
 """
 
-from __future__ import annotations
-
 import polars as pl
 import pytest
 

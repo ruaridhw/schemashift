@@ -1,7 +1,5 @@
 """Shared dtype utilities: string-to-Polars-type mapping and conversion."""
 
-from __future__ import annotations
-
 from typing import Literal
 
 import polars as pl

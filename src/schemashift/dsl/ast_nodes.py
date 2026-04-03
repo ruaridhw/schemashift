@@ -1,7 +1,5 @@
 """AST node definitions for the schemashift DSL."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -25,8 +23,8 @@ class BinaryOp:
     """A binary operator expression."""
 
     op: str  # +, -, *, /, %, ==, !=, >, <, >=, <=, &, |
-    left: ASTNode
-    right: ASTNode
+    left: "ASTNode"
+    right: "ASTNode"
 
 
 @dataclass(frozen=True)
@@ -34,7 +32,7 @@ class UnaryOp:
     """A unary operator expression."""
 
     op: str  # - (negation), ! (not)
-    operand: ASTNode
+    operand: "ASTNode"
 
 
 @dataclass(frozen=True)
@@ -46,17 +44,17 @@ class MethodCall:
     names such as ``"round"``, ``"abs"``.
     """
 
-    obj: ASTNode
+    obj: "ASTNode"
     method: str
-    args: tuple[ASTNode, ...] = field(default_factory=tuple)
+    args: tuple["ASTNode", ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
 class WhenClause:
     """A single when/then pair inside a when-chain."""
 
-    condition: ASTNode
-    value: ASTNode
+    condition: "ASTNode"
+    value: "ASTNode"
 
 
 @dataclass(frozen=True)
@@ -64,14 +62,14 @@ class WhenChain:
     """A complete when/otherwise conditional expression."""
 
     whens: tuple[WhenClause, ...]
-    otherwise: ASTNode
+    otherwise: "ASTNode"
 
 
 @dataclass(frozen=True)
 class Coalesce:
     """Return the first non-null value across a list of expressions."""
 
-    exprs: tuple[ASTNode, ...]
+    exprs: tuple["ASTNode", ...]
 
 
 # Type alias covering every node variant.

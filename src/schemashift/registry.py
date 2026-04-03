@@ -1,7 +1,5 @@
 """Format config registries — in-memory and file-system backed."""
 
-from __future__ import annotations
-
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -96,7 +94,7 @@ class FileSystemRegistry(Registry):
             return True
         return False
 
-    def load_schema(self, name: str | None = None) -> TargetSchema | None:
+    def load_schema(self, name: str | None = None) -> "TargetSchema | None":
         """Load a TargetSchema from the schemas/ subdirectory.
 
         If *name* is provided, loads ``{schemas_dir}/{name}.yaml`` (falling

@@ -1,7 +1,5 @@
 """CLI entry-point for schemashift using Click."""
 
-from __future__ import annotations
-
 import json
 import sys
 from pathlib import Path
@@ -204,7 +202,7 @@ def list_configs(registry: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -> TargetSchema:
+def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -> "TargetSchema":
     """Resolve a TargetSchema from an explicit path or a registry schemas/ dir.
 
     Resolution order:

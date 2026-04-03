@@ -1,7 +1,5 @@
 """Tests for streaming and lazy evaluation on large files."""
 
-from __future__ import annotations
-
 import polars as pl
 import pytest
 
@@ -19,7 +17,7 @@ class TestLazyEvaluation:
         result = transform(str(csv), config)
         assert isinstance(result, pl.LazyFrame)
 
-    def test_lazy_frame_not_materialized_before_collect(self, tmp_path):
+    def test_lazy_frame_not_materialised_before_collect(self, tmp_path):
         """Verify we can chain additional lazy operations before collect."""
         csv = tmp_path / "data.csv"
         pl.DataFrame({"val": range(100)}).write_csv(str(csv))

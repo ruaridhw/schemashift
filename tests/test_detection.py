@@ -1,7 +1,5 @@
 """Tests for format auto-detection."""
 
-from __future__ import annotations
-
 import pytest
 
 from schemashift.detection import detect_format
