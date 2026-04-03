@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .errors import ConfigValidationError
 
@@ -43,12 +43,12 @@ class ColumnMapping(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    target: str
-    source: str | None = None
-    expr: str | None = None
-    constant: Any = None
-    dtype: str | None = None
-    fillna: Any = None
+    target: str = Field(description="Output column name.")
+    source: str | None = Field(default=None, description="Source column name to rename.")
+    expr: str | None = Field(default=None, description="DSL expression string.")
+    constant: Any = Field(default=None, description="Literal value broadcast to all rows.")
+    dtype: str | None = Field(default=None, description="Optional Polars dtype cast applied after mapping.")
+    fillna: Any = Field(default=None, description="Value used to fill nulls after mapping.")
 
     @model_validator(mode="after")
     def _exactly_one_source_set(self) -> ColumnMapping:
@@ -79,10 +79,10 @@ class ReaderConfig(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    skip_rows: int = 0
-    sheet_name: str | int | None = None
-    separator: str | None = None
-    encoding: str = "utf-8"
+    skip_rows: int = Field(default=0, description="Number of rows to skip before the header.")
+    sheet_name: str | int | None = Field(default=None, description="Sheet name or 1-based index for Excel files.")
+    separator: str | None = Field(default=None, description="Column separator for CSV files; None auto-detects.")
+    encoding: str = Field(default="utf-8", description="File encoding.")
 
 
 class FormatConfig(BaseModel):
@@ -90,13 +90,13 @@ class FormatConfig(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    name: str
-    description: str = ""
-    version: int = 1
-    target_schema: str | None = None
-    reader: ReaderConfig = ReaderConfig()
-    columns: list[ColumnMapping]
-    drop_unmapped: bool = True
+    name: str = Field(description="Unique config identifier.")
+    description: str = Field(default="", description="Human-readable description of this format.")
+    version: int = Field(default=1, description="Config schema version.")
+    target_schema: str | None = Field(default=None, description="Name of the target schema this config maps to.")
+    reader: ReaderConfig = Field(default_factory=ReaderConfig, description="Low-level reader options.")
+    columns: list[ColumnMapping] = Field(description="Column mappings from source to target.")
+    drop_unmapped: bool = Field(default=True, description="If True, drop source columns not listed in mappings.")
 
     @model_validator(mode="after")
     def _unique_target_names(self) -> FormatConfig:

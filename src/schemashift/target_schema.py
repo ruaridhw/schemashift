@@ -3,12 +3,35 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import polars as pl
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .errors import SchemaValidationError
+
+DTypeStr = Literal[
+    "str",
+    "utf8",
+    "float32",
+    "float64",
+    "int8",
+    "int16",
+    "int32",
+    "int64",
+    "uint8",
+    "uint16",
+    "uint32",
+    "uint64",
+    "bool",
+    "date",
+    "datetime",
+    "time",
+    "duration",
+    "binary",
+    "categorical",
+]
 
 _DTYPE_MAP: dict[str, type[pl.DataType]] = {
     "str": pl.Utf8,
@@ -38,10 +61,10 @@ class TargetColumn(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    name: str
-    type: str
-    required: bool = True
-    description: str = ""
+    name: str = Field(description="Output column name.")
+    type: DTypeStr = Field(description="Polars dtype string (e.g. 'int64', 'str', 'float64').")
+    required: bool = Field(default=True, description="Whether this column must be present and non-null in output.")
+    description: str = Field(default="", description="Human-readable description of the column's purpose.")
 
 
 class TargetSchema(BaseModel):
@@ -49,9 +72,9 @@ class TargetSchema(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    name: str
-    description: str = ""
-    columns: list[TargetColumn]
+    name: str = Field(description="Schema identifier.")
+    description: str = Field(default="", description="Human-readable description of the schema's purpose.")
+    columns: list[TargetColumn] = Field(description="Ordered list of expected output columns.")
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> TargetSchema:
@@ -63,6 +86,7 @@ class TargetSchema(BaseModel):
         """Return names of columns marked as required."""
         return [col.name for col in self.columns if col.required]
 
+    # ANNOT: make this a standalone utility method instead
     def polars_dtype(self, type_str: str) -> type[pl.DataType]:
         """Convert a type string like 'float64' to the corresponding Polars DataType.
 
