@@ -13,6 +13,7 @@ from schemashift.errors import (
     SchemaValidationError,
     UnsupportedFileError,
 )
+from schemashift.llm import load_default_llm
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
 from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
@@ -53,4 +54,5 @@ __all__ = [
     "UnsupportedFileError",
     "LLMGenerationError",
     "ReaderError",
+    "load_default_llm",
 ]
