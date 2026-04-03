@@ -201,6 +201,20 @@ class TestFormatConfigSourceColumns:
         cfg = FormatConfig(name="f", columns=cols)
         assert cfg.source_columns() == set()
 
+    def test_single_quoted_col_refs_extracted(self):
+        cfg = FormatConfig(
+            name="f",
+            columns=[ColumnMapping(target="out", expr="col('price') * col('qty')")],
+        )
+        assert cfg.source_columns() == {"price", "qty"}
+
+    def test_nested_expr_col_refs_extracted(self):
+        cfg = FormatConfig(
+            name="f",
+            columns=[ColumnMapping(target="out", expr='coalesce(col("a"), col("b"))')],
+        )
+        assert cfg.source_columns() == {"a", "b"}
+
 
 class TestFormatConfigJsonRoundTrip:
     def test_round_trip_via_model_dump_and_validate(self):

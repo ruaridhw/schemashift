@@ -1,6 +1,5 @@
 """Pydantic v2 models for schemashift configuration."""
 
-import re
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -8,13 +7,54 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from .dtypes import DTYPE_MAP
 from .errors import ConfigValidationError
 
-# Matches col("column_name") in DSL expressions.
-_COL_PATTERN: re.Pattern[str] = re.compile(r'col\("([^"]+)"\)')
-
 # Sentinel for optional Any-typed fields where None is a valid user-supplied value.
 # Using PydanticUndefined as a default makes Pydantic treat the field as required,
 # so we define our own sentinel object instead.
 _UNSET: Any = object()
+
+
+def _col_refs_from_expr(expr: str) -> set[str]:
+    """Walk a DSL AST and return all referenced column names."""
+    from schemashift.dsl.ast_nodes import (
+        BinaryOp,
+        Coalesce,
+        ColRef,
+        CustomLookup,
+        Lookup,
+        MethodCall,
+        UnaryOp,
+        WhenChain,
+    )
+    from schemashift.dsl.parser import parse_dsl
+
+    ASTNode = object  # local alias for type hints only
+
+    def walk(node: ASTNode) -> set[str]:
+        match node:
+            case ColRef(name):
+                return {name}
+            case BinaryOp(_, left, right):
+                return walk(left) | walk(right)
+            case UnaryOp(_, operand):
+                return walk(operand)
+            case MethodCall(obj, _, args):
+                return walk(obj) | {r for a in args for r in walk(a)}
+            case WhenChain(whens, otherwise):
+                refs = walk(otherwise)
+                for clause in whens:
+                    refs |= walk(clause.condition) | walk(clause.value)
+                return refs
+            case Coalesce(exprs):
+                return {r for e in exprs for r in walk(e)}
+            case Lookup(inner, _):
+                return walk(inner)
+            case CustomLookup(inner, _, _):
+                return walk(inner)
+            case _:
+                return set()
+
+    return walk(parse_dsl(expr))
+
 
 _DTYPE_JSON_SCHEMA: dict[str, Any] = {
     "anyOf": [
@@ -154,12 +194,13 @@ class FormatConfig(BaseModel):
     def source_columns(self) -> set[str]:
         """Return all source column names referenced in this config.
 
-        Includes direct 'source' fields and col("...") references inside 'expr' fields.
+        Includes direct 'source' fields and all col("...") references inside 'expr' fields,
+        extracted by walking the DSL AST rather than regex-matching strings.
         """
         cols: set[str] = set()
         for mapping in self.columns:
             if mapping.source is not None:
                 cols.add(mapping.source)
             if mapping.expr is not None:
-                cols.update(_COL_PATTERN.findall(mapping.expr))
+                cols.update(_col_refs_from_expr(mapping.expr))
         return cols
