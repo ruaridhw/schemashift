@@ -108,12 +108,14 @@ def dry_run(config: FormatConfig, path: str | Path, n_rows: int = 10) -> pl.Data
 def auto_transform(
     path: str | Path,
     registry: Registry,
+    reader_config: ReaderConfig | None = None,
 ) -> pl.LazyFrame:
     """Auto-detect the format from the registry and transform the file.
 
     Args:
         path: Path to the source file.
         registry: Registry to search for a matching config.
+        reader_config: Optional reader configuration forwarded to the file reader.
 
     Returns:
         A transformed :class:`polars.LazyFrame`.
@@ -125,7 +127,7 @@ def auto_transform(
     from schemashift.detection import detect_format
     from schemashift.readers import read_header
 
-    columns = read_header(path)
+    columns = read_header(path, reader_config)
     config = detect_format(columns, registry)
 
     if config is None:
@@ -133,7 +135,7 @@ def auto_transform(
             f"No registered config matches the columns found in '{path}'. Columns present: {columns}"
         )
 
-    return transform(path, config)
+    return transform(path, config, reader_config)
 
 
 def smart_transform(
@@ -147,6 +149,7 @@ def smart_transform(
     max_retries: int = 2,
     n_sample_rows: int = 15,
     user_prompt: str | None = None,
+    reader_config: ReaderConfig | None = None,
 ) -> pl.LazyFrame:
     """Full detect-or-generate flow.
 
@@ -167,6 +170,7 @@ def smart_transform(
         max_retries: Max LLM retries.
         n_sample_rows: Rows to sample for LLM.
         user_prompt: Additional context for the LLM (e.g. unit conventions).
+        reader_config: Optional reader configuration forwarded to all file reads.
 
     Returns:
         Transformed pl.LazyFrame.
@@ -180,11 +184,11 @@ def smart_transform(
     from schemashift.readers import read_header
 
     # Try registry
-    columns = read_header(path)
+    columns = read_header(path, reader_config)
     config = detect_format(columns, registry)
 
     if config is not None:
-        lf = transform(path, config)
+        lf = transform(path, config, reader_config)
         if target_schema is not None:
             target_schema.validate_lazy(lf)
         return lf
@@ -207,6 +211,7 @@ def smart_transform(
         max_retries=max_retries,
         n_sample_rows=n_sample_rows,
         user_prompt=user_prompt,
+        reader_config=reader_config,
     )
 
     # Review callback
@@ -220,7 +225,7 @@ def smart_transform(
     if auto_register:
         registry.register(config)
 
-    lf = transform(path, config)
+    lf = transform(path, config, reader_config)
     if target_schema is not None:
         target_schema.validate_lazy(lf)
     return lf
