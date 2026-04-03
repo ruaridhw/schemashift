@@ -68,7 +68,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
-per-file-ignores = { "tests/fixtures/**" = ["E501", "UP017", "SIM108"] }
+per-file-ignores = { "tests/fixtures/**" = ["E501", "UP017", "SIM108"], "whitelist_vulture.py" = ["F821", "B018"] }
 
 [tool.black]
 line-length = 120
@@ -86,6 +86,22 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.vulture]
+ignore_decorators = [
+    "@field_validator",
+    "@model_validator",
+    "@*.command",
+    "@*.group",
+]
+ignore_names = [
+    "model_config",
+    "cls",
+    "schema_version",
+]
+exclude = [".venv/"]
+min_confidence = 60
+paths = ["src/", "whitelist_vulture.py"]
 
 [tool.typos.default]
 locale = "en-gb"
