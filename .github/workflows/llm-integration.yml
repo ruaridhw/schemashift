@@ -1,0 +1,24 @@
+name: LLM Integration Tests
+
+on:
+  workflow_dispatch:
+
+jobs:
+  llm-tests:
+    name: LLM Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v8.0.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Run LLM integration tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run pytest -m llm -v --no-header
