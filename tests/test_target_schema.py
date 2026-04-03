@@ -142,19 +142,23 @@ class TestValidateLazy:
         with pytest.raises(SchemaValidationError, match="Column 'id'"):
             test_schema.validate_lazy(df.lazy())
 
+    def test_missing_optional_column_passes(self, test_schema, matching_df):
+        lf = matching_df.drop("category").lazy()  # category is optional
+        test_schema.validate_lazy(lf)  # should not raise
+
     def test_multiple_errors_reported_together(self, test_schema):
         df = pl.DataFrame(
             {
                 "id": pl.Series(["1"], dtype=pl.Utf8),
                 "amount": pl.Series([1.0], dtype=pl.Float64),
-                # 'name' and 'category' missing
+                # 'name' (required) and 'category' (optional) missing
             }
         )
         with pytest.raises(SchemaValidationError) as exc_info:
             test_schema.validate_lazy(df.lazy())
         message = str(exc_info.value)
         assert "Missing column: 'name'" in message
-        assert "Missing column: 'category'" in message
+        assert "Missing column: 'category'" not in message
 
 
 class TestValidateEager:

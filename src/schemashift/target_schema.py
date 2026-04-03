@@ -90,7 +90,8 @@ class TargetSchema(BaseModel):
 
         for col in self.columns:
             if col.name not in actual_names:
-                errors.append(f"Missing column: '{col.name}'")
+                if col.required:
+                    errors.append(f"Missing column: '{col.name}'")
                 continue
             expected_dtype = self.polars_dtype(col.type)
             actual_dtype = schema[col.name]
