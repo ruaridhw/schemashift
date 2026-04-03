@@ -125,7 +125,7 @@
             }
           ],
           "default": null,
-          "description": "Excel sheet name (string) or 1-based index (int). Ignored for non-Excel files.",
+          "description": "Excel sheet name (string) or 0-based index (int). Ignored for non-Excel files.",
           "title": "Sheet Name"
         },
         "skip_rows": {
