@@ -12,3 +12,4 @@ dist/
 .env
 .idea/
 docs/_build/
+plans/
