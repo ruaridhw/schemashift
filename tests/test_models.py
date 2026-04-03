@@ -11,13 +11,13 @@ class TestColumnMappingValidation:
         col = ColumnMapping(target="out", source="in")
         assert col.source == "in"
         assert col.expr is None
-        assert col.constant is None
+        assert not col.has_constant()
 
     def test_expr_only_is_valid(self):
         col = ColumnMapping(target="out", expr='col("price") * 1.2')
         assert col.expr == 'col("price") * 1.2'
         assert col.source is None
-        assert col.constant is None
+        assert not col.has_constant()
 
     def test_constant_only_is_valid(self):
         col = ColumnMapping(target="flag", constant=True)
@@ -53,6 +53,23 @@ class TestColumnMappingValidation:
     def test_all_three_raises_config_error(self):
         with pytest.raises(ConfigValidationError, match="exactly one"):
             ColumnMapping(target="out", source="in", expr='col("in")', constant=0)
+
+    def test_constant_none_is_valid(self) -> None:
+        col = ColumnMapping(target="flag", constant=None)
+        assert col.has_constant() is True
+        assert col.constant is None
+
+    def test_constant_none_round_trips_json(self) -> None:
+        import json
+
+        config = FormatConfig(
+            name="test",
+            columns=[ColumnMapping(target="flag", constant=None)],
+        )
+        dumped = json.loads(config.model_dump_json())
+        reloaded = FormatConfig.model_validate(dumped)
+        assert reloaded.columns[0].constant is None
+        assert reloaded.columns[0].has_constant()
 
 
 class TestColumnMappingDtypeValidation:

@@ -4,7 +4,6 @@
       "description": "Describes how to produce one output column.",
       "properties": {
         "constant": {
-          "default": null,
           "description": "Literal constant broadcast to all rows. Mutually exclusive with 'source' and 'expr'.",
           "title": "Constant"
         },
@@ -61,7 +60,6 @@
           "title": "Expr"
         },
         "fillna": {
-          "default": null,
           "description": "Fill-value applied to nulls after mapping.",
           "title": "Fillna"
         },

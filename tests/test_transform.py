@@ -131,6 +131,16 @@ class TestTransformConstantMapping:
         df = transform(SAMPLE_CSV, config).collect()
         assert df["version"].to_list() == [42] * 5
 
+    def test_constant_none_broadcasts_nulls(self, tmp_path: Path) -> None:
+        csv = tmp_path / "data.csv"
+        csv.write_text("a\n1\n2\n")
+        config = FormatConfig(
+            name="test",
+            columns=[ColumnMapping(target="flag", constant=None)],
+        )
+        result = transform(str(csv), config).collect()
+        assert result["flag"].is_null().all()
+
 
 # ---------------------------------------------------------------------------
 # Dtype casting
