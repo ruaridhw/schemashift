@@ -11,18 +11,39 @@ from .errors import ConfigValidationError
 # Matches col("column_name") in DSL expressions.
 _COL_PATTERN: re.Pattern[str] = re.compile(r'col\("([^"]+)"\)')
 
+_DTYPE_JSON_SCHEMA: dict = {
+    "anyOf": [
+        {"enum": sorted(DTYPE_MAP), "type": "string"},
+        {"type": "null"},
+    ]
+}
+
 
 class ColumnMapping(BaseModel):
     """Describes how to produce one output column."""
 
     model_config = {"from_attributes": True}
 
-    target: str = Field(description="Output column name.")
-    source: str | None = Field(default=None, description="Source column name to rename.")
-    expr: str | None = Field(default=None, description="DSL expression string.")
-    constant: Any = Field(default=None, description="Literal value broadcast to all rows.")
-    dtype: str | None = Field(default=None, description="Optional Polars dtype cast applied after mapping.")
-    fillna: Any = Field(default=None, description="Value used to fill nulls after mapping.")
+    target: str = Field(description="Name of the output column produced by this mapping.")
+    source: str | None = Field(
+        default=None, description="Source column name in the input file. Mutually exclusive with 'expr' and 'constant'."
+    )
+    expr: str | None = Field(
+        default=None,
+        description=(
+            'DSL expression to compute this column (e.g. col("price") * 1.2).'
+            " Mutually exclusive with 'source' and 'constant'."
+        ),
+    )
+    constant: Any = Field(
+        default=None, description="Literal constant broadcast to all rows. Mutually exclusive with 'source' and 'expr'."
+    )
+    dtype: str | None = Field(
+        default=None,
+        description="Target Polars dtype to cast this column to after mapping.",
+        json_schema_extra=_DTYPE_JSON_SCHEMA,
+    )
+    fillna: Any = Field(default=None, description="Fill-value applied to nulls after mapping.")
 
     @model_validator(mode="after")
     def _exactly_one_source_set(self) -> "ColumnMapping":
@@ -53,10 +74,12 @@ class ReaderConfig(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    skip_rows: int = Field(default=0, description="Number of rows to skip before the header.")
-    sheet_name: str | int | None = Field(default=None, description="Sheet name or 1-based index for Excel files.")
-    separator: str | None = Field(default=None, description="Column separator for CSV files; None auto-detects.")
-    encoding: str = Field(default="utf-8", description="File encoding.")
+    skip_rows: int = Field(default=0, description="Number of rows to skip before the header.", ge=0)
+    sheet_name: str | int | None = Field(
+        default=None, description="Excel sheet name (string) or 1-based index (int). Ignored for non-Excel files."
+    )
+    separator: str | None = Field(default=None, description="CSV field delimiter. Auto-detected when null.")
+    encoding: str = Field(default="utf-8", description="Character encoding of the source file.")
 
 
 class FormatConfig(BaseModel):
@@ -64,13 +87,13 @@ class FormatConfig(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    name: str = Field(description="Unique config identifier.")
+    name: str = Field(description="Unique identifier for this format configuration.")
     description: str = Field(default="", description="Human-readable description of this format.")
-    version: int = Field(default=1, description="Config schema version.")
-    target_schema: str | None = Field(default=None, description="Name of the target schema this config maps to.")
+    version: int = Field(default=1, description="Config version. Increment on breaking changes.", ge=1)
+    target_schema: str | None = Field(default=None, description="Name of the TargetSchema to validate against.")
     reader: ReaderConfig = Field(default_factory=ReaderConfig, description="Low-level reader options.")
-    columns: list[ColumnMapping] = Field(description="Column mappings from source to target.")
-    drop_unmapped: bool = Field(default=True, description="If True, drop source columns not listed in mappings.")
+    columns: list[ColumnMapping] = Field(description="Ordered list of column mappings defining the output schema.")
+    drop_unmapped: bool = Field(default=True, description="Drop source columns not referenced by any mapping.")
 
     @model_validator(mode="after")
     def _unique_target_names(self) -> "FormatConfig":

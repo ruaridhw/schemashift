@@ -1,0 +1,14 @@
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["**/configs/*.json", "**/formats/*.json", "**/registry/*.json"],
+      "url": "./src/schemashift/schema/format_config.json"
+    }
+  ],
+  "yaml.schemas": {
+    "./src/schemashift/schema/format_config.json": [
+      "**/configs/*.yaml", "**/configs/*.yml",
+      "**/formats/*.yaml", "**/formats/*.yml"
+    ]
+  }
+}

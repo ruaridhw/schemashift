@@ -1,0 +1,202 @@
+{
+  "$defs": {
+    "ColumnMapping": {
+      "description": "Describes how to produce one output column.",
+      "properties": {
+        "constant": {
+          "default": null,
+          "description": "Literal constant broadcast to all rows. Mutually exclusive with 'source' and 'expr'.",
+          "title": "Constant"
+        },
+        "dtype": {
+          "anyOf": [
+            {
+              "enum": [
+                "binary",
+                "bool",
+                "boolean",
+                "categorical",
+                "date",
+                "datetime",
+                "duration",
+                "float32",
+                "float64",
+                "int16",
+                "int32",
+                "int64",
+                "int8",
+                "integer",
+                "null",
+                "number",
+                "str",
+                "string",
+                "time",
+                "uint16",
+                "uint32",
+                "uint64",
+                "uint8",
+                "utf8"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Target Polars dtype to cast this column to after mapping.",
+          "title": "Dtype"
+        },
+        "expr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "DSL expression to compute this column (e.g. col(\"price\") * 1.2). Mutually exclusive with 'source' and 'constant'.",
+          "title": "Expr"
+        },
+        "fillna": {
+          "default": null,
+          "description": "Fill-value applied to nulls after mapping.",
+          "title": "Fillna"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source column name in the input file. Mutually exclusive with 'expr' and 'constant'.",
+          "title": "Source"
+        },
+        "target": {
+          "description": "Name of the output column produced by this mapping.",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "ColumnMapping",
+      "type": "object"
+    },
+    "ReaderConfig": {
+      "description": "Low-level options passed to the file reader.",
+      "properties": {
+        "encoding": {
+          "default": "utf-8",
+          "description": "Character encoding of the source file.",
+          "title": "Encoding",
+          "type": "string"
+        },
+        "separator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CSV field delimiter. Auto-detected when null.",
+          "title": "Separator"
+        },
+        "sheet_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Excel sheet name (string) or 1-based index (int). Ignored for non-Excel files.",
+          "title": "Sheet Name"
+        },
+        "skip_rows": {
+          "default": 0,
+          "description": "Number of rows to skip before the header.",
+          "minimum": 0,
+          "title": "Skip Rows",
+          "type": "integer"
+        }
+      },
+      "title": "ReaderConfig",
+      "type": "object"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Top-level configuration for a single source format.",
+  "properties": {
+    "columns": {
+      "description": "Ordered list of column mappings defining the output schema.",
+      "items": {
+        "$ref": "#/$defs/ColumnMapping"
+      },
+      "title": "Columns",
+      "type": "array"
+    },
+    "description": {
+      "default": "",
+      "description": "Human-readable description of this format.",
+      "title": "Description",
+      "type": "string"
+    },
+    "drop_unmapped": {
+      "default": true,
+      "description": "Drop source columns not referenced by any mapping.",
+      "title": "Drop Unmapped",
+      "type": "boolean"
+    },
+    "name": {
+      "description": "Unique identifier for this format configuration.",
+      "title": "Name",
+      "type": "string"
+    },
+    "reader": {
+      "$ref": "#/$defs/ReaderConfig",
+      "description": "Low-level reader options."
+    },
+    "target_schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Name of the TargetSchema to validate against.",
+      "title": "Target Schema"
+    },
+    "version": {
+      "default": 1,
+      "description": "Config version. Increment on breaking changes.",
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "columns"
+  ],
+  "title": "FormatConfig",
+  "type": "object"
+}
