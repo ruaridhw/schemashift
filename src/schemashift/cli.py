@@ -24,6 +24,8 @@ from schemashift.transform import auto_transform, validate_config
 from schemashift.transform import dry_run as _dry_run
 from schemashift.transform import transform as _transform
 
+_CONFIG_PATH_TYPE = click.Path(exists=True, file_okay=True, readable=True, path_type=Path)
+
 
 @click.group()
 def cli() -> None:
@@ -32,10 +34,10 @@ def cli() -> None:
 
 @cli.command()
 @click.argument("file")
-@click.option("--config", "-c", help="Path to config JSON file.")
+@click.option("--config", "-c", type=_CONFIG_PATH_TYPE, help="Path to config JSON.")
 @click.option("--registry", "-r", help="Path to registry directory.")
 @click.option("--output", "-o", help="Output file path (.csv, .parquet, or .json).")
-def transform(file: str, config: str | None, registry: str | None, output: str | None) -> None:
+def transform(file: str, config: Path | None, registry: str | None, output: str | None) -> None:
     """Transform a file using a config or auto-detect from registry."""
     try:
         if config is not None:
@@ -64,8 +66,8 @@ def transform(file: str, config: str | None, registry: str | None, output: str |
 
 
 @cli.command()
-@click.argument("config_path")
-def validate(config_path: str) -> None:
+@click.argument("config_path", type=_CONFIG_PATH_TYPE)
+def validate(config_path: Path) -> None:
     """Validate a format config file."""
     try:
         fmt_config = _load_format_config(config_path)
@@ -84,10 +86,10 @@ def validate(config_path: str) -> None:
 
 
 @cli.command(name="dry-run")
-@click.argument("config_path")
+@click.argument("config_path", type=_CONFIG_PATH_TYPE)
 @click.option("--sample", "-s", required=True, help="Sample data file.")
 @click.option("--rows", "-n", default=10, show_default=True, help="Number of rows to process.")
-def dry_run(config_path: str, sample: str, rows: int) -> None:
+def dry_run(config_path: Path, sample: str, rows: int) -> None:
     """Dry-run a config against sample data."""
     try:
         fmt_config = _load_format_config(config_path)
@@ -281,9 +283,9 @@ def _load_default_llm() -> Any:
     )
 
 
-def _load_format_config(path: str) -> FormatConfig:
+def _load_format_config(path: Path) -> FormatConfig:
     """Load a FormatConfig from a JSON file."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
     return FormatConfig.model_validate(data)
 
 
