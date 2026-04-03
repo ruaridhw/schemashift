@@ -5,7 +5,7 @@ import pytest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage
 
-from schemashift.errors import FormatDetectionError
+from schemashift.errors import FormatDetectionError, ReviewRejectedError
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.registry import DictRegistry
 from schemashift.target_schema import TargetColumn, TargetSchema
@@ -141,7 +141,7 @@ class TestReviewFn:
         assert len(lf.collect()) == 2
 
     def test_review_fn_rejection(self, sample_csv, schema):
-        with pytest.raises(FormatDetectionError, match="rejected"):
+        with pytest.raises(ReviewRejectedError, match="rejected"):
             smart_transform(
                 sample_csv,
                 registry=DictRegistry(),

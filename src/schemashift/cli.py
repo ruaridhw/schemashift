@@ -15,6 +15,7 @@ from schemashift.errors import (
     AmbiguousFormatError,
     ConfigValidationError,
     FormatDetectionError,
+    ReviewRejectedError,
 )
 from schemashift.models import FormatConfig
 from schemashift.registry import FileSystemRegistry
@@ -55,7 +56,7 @@ def transform(file: str, config: Path | None, registry: str | None, output: str 
         else:
             click.echo(str(df.head(20)))
 
-    except (FormatDetectionError, AmbiguousFormatError, ConfigValidationError) as exc:
+    except (FormatDetectionError, AmbiguousFormatError, ConfigValidationError, ReviewRejectedError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
     except Exception as exc:
