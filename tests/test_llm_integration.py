@@ -64,7 +64,7 @@ class TestGenerateConfigIntegration:
             target_schema=lot_movement_schema,
             llm=llm,
             n_sample_rows=5,
-            prompt=(
+            user_prompt=(
                 "The QTY column represents wafer count per lot. "
                 "HOLD_STATUS of 'NONE' means the lot is NOT on hold (false)."
             ),

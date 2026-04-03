@@ -79,13 +79,13 @@ class TestBuildPrompt:
 
     def test_custom_prompt_appended(self, schema):
         df = pl.DataFrame({"x": [1]})
-        result = build_prompt(df, schema, ["x"], prompt="volume is in lots not wafers")
+        result = build_prompt(df, schema, ["x"], user_prompt="volume is in lots not wafers")
         assert "Additional Context" in result
         assert "volume is in lots not wafers" in result
 
     def test_no_additional_context_when_prompt_none(self, schema):
         df = pl.DataFrame({"x": [1]})
-        result = build_prompt(df, schema, ["x"], prompt=None)
+        result = build_prompt(df, schema, ["x"], user_prompt=None)
         assert "Additional Context" not in result
 
 
