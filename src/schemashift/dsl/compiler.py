@@ -5,8 +5,6 @@ a ``polars.Expr`` that can be used directly inside ``df.select()``,
 ``df.with_columns()``, etc.
 """
 
-from __future__ import annotations
-
 import polars as pl
 
 from schemashift.dtypes import DTYPE_MAP

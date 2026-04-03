@@ -1,7 +1,5 @@
 """Pydantic v2 models for schemashift configuration."""
 
-from __future__ import annotations
-
 import re
 from typing import Any
 
@@ -27,7 +25,7 @@ class ColumnMapping(BaseModel):
     fillna: Any = Field(default=None, description="Value used to fill nulls after mapping.")
 
     @model_validator(mode="after")
-    def _exactly_one_source_set(self) -> ColumnMapping:
+    def _exactly_one_source_set(self) -> "ColumnMapping":
         set_fields = sum(
             [
                 self.source is not None,
@@ -75,7 +73,7 @@ class FormatConfig(BaseModel):
     drop_unmapped: bool = Field(default=True, description="If True, drop source columns not listed in mappings.")
 
     @model_validator(mode="after")
-    def _unique_target_names(self) -> FormatConfig:
+    def _unique_target_names(self) -> "FormatConfig":
         targets = [col.target for col in self.columns]
         seen: set[str] = set()
         duplicates: list[str] = []

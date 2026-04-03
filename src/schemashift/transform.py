@@ -1,7 +1,5 @@
 """Core transform engine: apply a FormatConfig to a file."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -141,7 +139,7 @@ def auto_transform(
 def smart_transform(
     path: str | Path,
     registry: Registry,
-    target_schema: TargetSchema | None = None,
+    target_schema: "TargetSchema | None" = None,
     llm: Any = None,  # ANNOT: the typing here should be stronger
     review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
     auto_register: bool = False,

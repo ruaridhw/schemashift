@@ -5,8 +5,6 @@ Converts a DSL expression string into an AST composed of nodes from
 for any invalid input.
 """
 
-from __future__ import annotations
-
 import ast
 import re
 from enum import Enum, auto

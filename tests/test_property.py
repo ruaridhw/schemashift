@@ -1,7 +1,5 @@
 """Property-based tests for schemashift using Hypothesis."""
 
-from __future__ import annotations
-
 import os
 import tempfile
 

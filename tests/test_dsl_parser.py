@@ -1,7 +1,5 @@
 """Tests for the DSL parser — grammar productions, AST shapes, and error handling."""
 
-from __future__ import annotations
-
 import pytest
 
 from schemashift.dsl.ast_nodes import (

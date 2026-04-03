@@ -1,7 +1,5 @@
 """Targeted DSL fuzz tests for robustness."""
 
-from __future__ import annotations
-
 import pytest
 
 from schemashift.dsl.parser import parse_dsl

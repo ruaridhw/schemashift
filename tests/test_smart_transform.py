@@ -1,7 +1,5 @@
 """Tests for smart_transform() — the full detect-or-generate flow."""
 
-from __future__ import annotations
-
 import polars as pl
 import pytest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel

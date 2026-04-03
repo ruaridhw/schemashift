@@ -1,7 +1,5 @@
 """Auto-detect which registered FormatConfig matches a file's columns."""
 
-from __future__ import annotations
-
 from schemashift.errors import AmbiguousFormatError
 from schemashift.models import FormatConfig
 from schemashift.registry import Registry
