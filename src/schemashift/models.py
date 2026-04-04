@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .dsl import collect_col_refs, parse_dsl
 from .dtypes import DTYPE_MAP, DType
@@ -86,12 +86,6 @@ class ColumnMapping(BaseModel):
             )
         return self
 
-    @field_validator("dtype")
-    @classmethod
-    def _validate_dtype(cls, value: DType | None) -> DType | None:
-        if value is not None and value not in DTYPE_MAP:
-            raise ConfigValidationError(f"Invalid dtype '{value}'. Valid values are: {sorted(DTYPE_MAP)}")
-        return value
 
 
 class ReaderConfig(BaseModel):
