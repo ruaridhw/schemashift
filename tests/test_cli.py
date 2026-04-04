@@ -4,10 +4,14 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import click
+import polars as pl
 import pytest
 from click.testing import CliRunner
 
 from schemashift.cli import _resolve_schema, cli
+from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.registry import FileSystemRegistry
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -26,9 +30,6 @@ def runner() -> CliRunner:
 @pytest.fixture
 def registry_dir(tmp_path: Path) -> Path:
     """A temporary registry directory pre-populated with a config."""
-    from schemashift.models import ColumnMapping, FormatConfig
-    from schemashift.registry import FileSystemRegistry
-
     reg = FileSystemRegistry(tmp_path)
     reg.register(
         FormatConfig(
@@ -212,8 +213,6 @@ class TestResolveSchema:
         assert schema.name == "test_schema"
 
     def test_registry_multiple_schemas_raises_usage_error(self, tmp_path: Path) -> None:
-        import click
-
         schemas_dir = tmp_path / "schemas"
         schemas_dir.mkdir()
         (schemas_dir / "schema_a.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
@@ -223,15 +222,11 @@ class TestResolveSchema:
             _resolve_schema(None, str(tmp_path))
 
     def test_registry_no_schemas_dir_raises_usage_error(self, tmp_path: Path) -> None:
-        import click
-
         # tmp_path has no schemas/ subdirectory
         with pytest.raises(click.UsageError, match="Provide --target-schema"):
             _resolve_schema(None, str(tmp_path))
 
     def test_no_args_raises_usage_error(self) -> None:
-        import click
-
         with pytest.raises(click.UsageError, match="Provide --target-schema"):
             _resolve_schema(None, None)
 
@@ -272,8 +267,6 @@ class TestGenerateCommand:
 
     @pytest.fixture
     def mock_config(self):
-        from schemashift.models import ColumnMapping, FormatConfig
-
         return FormatConfig(
             name="generated_format",
             description="Auto-generated",
@@ -394,14 +387,12 @@ class TestGenerateCommand:
         schema_file: Path,
         mock_config,
     ) -> None:
-        import polars as pl
-
         fake_llm = MagicMock()
         fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
             patch("schemashift.llm.generate_config", return_value=mock_config),
-            patch("schemashift.transform.dry_run", return_value=fake_sample),
+            patch("schemashift.cli._dry_run", return_value=fake_sample),
         ):
             result = runner.invoke(
                 cli,
@@ -420,14 +411,12 @@ class TestGenerateCommand:
         schema_file: Path,
         mock_config,
     ) -> None:
-        import polars as pl
-
         fake_llm = MagicMock()
         fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
             patch("schemashift.llm.generate_config", return_value=mock_config),
-            patch("schemashift.transform.dry_run", return_value=fake_sample),
+            patch("schemashift.cli._dry_run", return_value=fake_sample),
         ):
             result = runner.invoke(
                 cli,

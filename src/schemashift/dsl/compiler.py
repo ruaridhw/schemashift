@@ -12,6 +12,7 @@ import polars as pl
 from schemashift.dtypes import DTYPE_MAP, DType
 from schemashift.errors import DSLRuntimeError, DSLSyntaxError
 
+from ._lookups import TABLES
 from .ast_nodes import (
     ASTNode,
     BinaryOp,
@@ -137,7 +138,6 @@ def compile_dsl(node: ASTNode) -> pl.Expr:  # noqa: C901 (complex but intentiona
             return pl.coalesce([compile_dsl(e) for e in exprs])
 
         case Lookup(expr, table_name):
-            from schemashift.dsl._lookups import TABLES
 
             if table_name not in TABLES:
                 raise DSLSyntaxError(
@@ -149,7 +149,6 @@ def compile_dsl(node: ASTNode) -> pl.Expr:  # noqa: C901 (complex but intentiona
             return compile_dsl(expr).replace(list(table.keys()), list(table.values()))
 
         case CustomLookup(expr, mapping, base_table):
-            from schemashift.dsl._lookups import TABLES
 
             if base_table is not None:
                 if base_table not in TABLES:

@@ -1,6 +1,7 @@
 """LLM-assisted config generation for schemashift."""
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -126,17 +127,15 @@ def load_default_llm() -> Any:
         ImportError: When ``langchain-anthropic`` is not installed.
         ValueError: When no recognised API key is found in the environment.
     """
-    import os
-
     try:
-        from dotenv import load_dotenv
+        from dotenv import load_dotenv  # noqa: PLC0415
 
         load_dotenv()
     except ImportError:
         pass  # python-dotenv optional; env vars may already be set
 
     try:
-        from langchain_anthropic import ChatAnthropic
+        from langchain_anthropic import ChatAnthropic  # noqa: PLC0415
     except ImportError as exc:
         raise ImportError("langchain-anthropic is not installed. Run: pip install 'schemashift[llm]'") from exc
 

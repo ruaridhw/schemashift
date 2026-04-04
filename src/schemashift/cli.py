@@ -3,10 +3,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from schemashift.target_schema import TargetSchema
+from typing import Any
 
 import click
 import polars as pl
@@ -138,7 +135,7 @@ def generate(  # noqa: PLR0913
     (Azure AI Foundry) to be set in the environment.
     """
     try:
-        from schemashift.llm import generate_config
+        from schemashift.llm import generate_config  # noqa: PLC0415
 
         schema = _resolve_schema(target_schema, registry)
 
@@ -160,9 +157,7 @@ def generate(  # noqa: PLR0913
             click.echo("\nGenerated config:")
             click.echo(config.model_dump_json(indent=2))
 
-            from schemashift.transform import dry_run
-
-            sample = dry_run(config, file, n_rows=5)
+            sample = _dry_run(config, file, n_rows=5)
             click.echo("\nSample output (first 5 rows):")
             click.echo(str(sample))
 
@@ -231,7 +226,7 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
     2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_schema`.
     3. Otherwise raise :class:`click.UsageError`.
     """
-    from schemashift.target_schema import TargetSchema
+    from schemashift.target_schema import TargetSchema  # noqa: PLC0415
 
     if target_schema_path is not None:
         return TargetSchema.from_yaml(target_schema_path)
@@ -248,7 +243,7 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
 
 
 def _load_default_llm() -> Any:
-    from schemashift.llm import load_default_llm
+    from schemashift.llm import load_default_llm  # noqa: PLC0415
 
     try:
         return load_default_llm()

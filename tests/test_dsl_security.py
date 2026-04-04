@@ -211,9 +211,7 @@ class TestRobustness:
 class TestCastValidation:
     def test_invalid_cast_type_rejected(self) -> None:
         """Unknown cast target type raises DSLSyntaxError (caught during compile)."""
-        from schemashift.errors import DSLSyntaxError as DslSE
-
-        with pytest.raises(DslSE):
+        with pytest.raises(DSLSyntaxError):
             parse_and_compile('col("x").cast("pickle")')
 
     def test_valid_cast_types_accepted(self) -> None:
