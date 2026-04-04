@@ -14,6 +14,7 @@ from schemashift.errors import (
     FormatDetectionError,
     ReviewRejectedError,
 )
+from schemashift.llm import generate_config, load_default_llm
 from schemashift.models import FormatConfig
 from schemashift.orchestration import auto_transform
 from schemashift.registry import FileSystemRegistry
@@ -135,8 +136,6 @@ def generate(  # noqa: PLR0913
     (Azure AI Foundry) to be set in the environment.
     """
     try:
-        from schemashift.llm import generate_config  # noqa: PLC0415
-
         schema = _resolve_schema(target_schema, registry)
 
         # Try to load LangChain LLM from environment
@@ -243,8 +242,6 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
 
 
 def _load_default_llm() -> Any:
-    from schemashift.llm import load_default_llm  # noqa: PLC0415
-
     try:
         return load_default_llm()
     except (ImportError, ValueError) as exc:

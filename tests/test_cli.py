@@ -287,7 +287,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config) as mock_gen,
+            patch("schemashift.cli.generate_config", return_value=mock_config) as mock_gen,
         ):
             result = runner.invoke(
                 cli,
@@ -311,7 +311,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
         ):
             result = runner.invoke(
                 cli,
@@ -332,7 +332,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
         ):
             result = runner.invoke(
                 cli,
@@ -363,7 +363,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
         ):
             result = runner.invoke(
                 cli,
@@ -391,7 +391,7 @@ class TestGenerateCommand:
         fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
             patch("schemashift.cli._dry_run", return_value=fake_sample),
         ):
             result = runner.invoke(
@@ -415,7 +415,7 @@ class TestGenerateCommand:
         fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
             patch("schemashift.cli._dry_run", return_value=fake_sample),
         ):
             result = runner.invoke(
