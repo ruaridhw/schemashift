@@ -199,7 +199,7 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
                     expression="",
                     position=-1,
                 )
-            return base.cast(DTYPE_MAP[cast(DType, type_str)])
+            return base.cast(DTYPE_MAP[cast("DType", type_str)])
 
         case "fill_null":
             _expect_arity(method, args, 1)
