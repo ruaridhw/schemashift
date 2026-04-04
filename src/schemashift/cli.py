@@ -228,8 +228,7 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
 
     Resolution order:
     1. If *target_schema_path* is given, load it directly.
-    2. If *registry_path* is given, glob for ``*.yaml``/``*.yml`` in
-       ``{registry_path}/schemas/``.  Exactly one match is required.
+    2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_schema`.
     3. Otherwise raise :class:`click.UsageError`.
     """
     from schemashift.target_schema import TargetSchema
@@ -238,16 +237,12 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
         return TargetSchema.from_yaml(target_schema_path)
 
     if registry_path is not None:
-        schemas_dir = Path(registry_path) / "schemas"
-        if schemas_dir.exists():
-            yamls = list(schemas_dir.glob("*.yaml")) + list(schemas_dir.glob("*.yml"))
-            if len(yamls) == 1:
-                return TargetSchema.from_yaml(yamls[0])
-            elif len(yamls) > 1:
-                names = [y.name for y in yamls]
-                raise click.UsageError(
-                    f"Multiple schemas found in '{schemas_dir}': {names}. Use --target-schema to specify one."
-                )
+        try:
+            schema = FileSystemRegistry(registry_path).load_schema()
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        if schema is not None:
+            return schema
 
     raise click.UsageError("Provide --target-schema or --registry with a schemas/ subdirectory.")
 
