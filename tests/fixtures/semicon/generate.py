@@ -312,7 +312,7 @@ def gen_promise():
 
 
 def gen_infinityqs():
-    from openpyxl import Workbook
+    from openpyxl import Workbook  # noqa: PLC0415
 
     wb = Workbook()
     ws = wb.active
@@ -563,7 +563,7 @@ def gen_partner_jp():
 
 
 def gen_operator_log():
-    from openpyxl import Workbook
+    from openpyxl import Workbook  # noqa: PLC0415
 
     wb = Workbook()
     ws = wb.active

@@ -38,7 +38,7 @@ def parquet_file(tmp_path: Path) -> Path:
 def xlsx_file(tmp_path: Path) -> Path:
     """Create a small Excel fixture programmatically (requires fastexcel/openpyxl)."""
     pytest.importorskip("openpyxl")
-    import openpyxl
+    import openpyxl  # noqa: PLC0415
 
     wb = openpyxl.Workbook()
     ws = wb.active
