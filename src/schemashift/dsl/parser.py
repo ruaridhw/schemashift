@@ -196,7 +196,8 @@ def tokenize(expression: str) -> list[Token]:
         elif kind == "STRING":
             tokens.append(Token(TT.STRING, _unescape_string(text), pos))
         else:
-            assert kind is not None
+            if kind is None:  # pragma: no cover
+                raise DSLSyntaxError(f"Unexpected token at position {pos}", expression=expression, position=pos)
             tt = _TT_MAP[kind]
             tokens.append(Token(tt, text, pos))
         pos = m.end()

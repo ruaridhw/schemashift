@@ -5,9 +5,11 @@ a ``polars.Expr`` that can be used directly inside ``df.select()``,
 ``df.with_columns()``, etc.
 """
 
+from typing import cast
+
 import polars as pl
 
-from schemashift.dtypes import DTYPE_MAP
+from schemashift.dtypes import DTYPE_MAP, DType
 from schemashift.errors import DSLRuntimeError, DSLSyntaxError
 
 from .ast_nodes import (
@@ -197,7 +199,7 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
                     expression="",
                     position=-1,
                 )
-            return base.cast(DTYPE_MAP[type_str])
+            return base.cast(DTYPE_MAP[cast(DType, type_str)])
 
         case "fill_null":
             _expect_arity(method, args, 1)
