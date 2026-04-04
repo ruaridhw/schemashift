@@ -18,7 +18,7 @@ EXPECTED_COLUMNS = ["id", "name", "amount", "category", "active"]
 EXPECTED_ROW_COUNT = 5
 
 
-@pytest.fixture()
+@pytest.fixture
 def parquet_file(tmp_path: Path) -> Path:
     df = pl.DataFrame(
         {
@@ -34,7 +34,7 @@ def parquet_file(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture()
+@pytest.fixture
 def xlsx_file(tmp_path: Path) -> Path:
     """Create a small Excel fixture programmatically (requires fastexcel/openpyxl)."""
     pytest.importorskip("openpyxl")
@@ -58,7 +58,7 @@ def xlsx_file(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture()
+@pytest.fixture
 def csv_with_skip_rows(tmp_path: Path) -> Path:
     content = "# comment line\n# another comment\nid,name,value\n1,Alice,10\n2,Bob,20\n"
     path = tmp_path / "skipped.csv"

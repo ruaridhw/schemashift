@@ -18,12 +18,12 @@ SAMPLE_CSV = str(FIXTURES / "csv" / "sample.csv")
 SALES_CONFIG = str(FIXTURES / "configs" / "sales.json")
 
 
-@pytest.fixture()
+@pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry_dir(tmp_path: Path) -> Path:
     """A temporary registry directory pre-populated with a config."""
     from schemashift.models import ColumnMapping, FormatConfig
@@ -264,13 +264,13 @@ columns:
 class TestGenerateCommand:
     """Tests for the generate command using a mocked LLM."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def schema_file(self, tmp_path: Path) -> Path:
         p = tmp_path / "schema.yaml"
         p.write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
         return p
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_config(self):
         from schemashift.models import ColumnMapping, FormatConfig
 

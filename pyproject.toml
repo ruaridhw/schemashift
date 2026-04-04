@@ -73,7 +73,7 @@ line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "S", "W", "C4", "C90"]
+select = ["E", "F", "I", "UP", "B", "SIM", "S", "W", "C4", "C90", "PT"]
 per-file-ignores = { "tests/**" = ["S101"], "tests/fixtures/**" = ["E501", "UP017", "SIM108"], "whitelist_vulture.py" = ["F821", "B018"], "src/schemashift/dsl/parser.py" = ["C901"] }
 
 [tool.black]
