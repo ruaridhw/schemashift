@@ -94,17 +94,6 @@ def dry_run(config: FormatConfig, path: str | Path, n_rows: int = 10) -> pl.Data
     return result
 
 
-def __getattr__(name: str):
-    """Lazy re-export of orchestration functions to avoid circular imports."""
-    if name in ("auto_transform", "smart_transform"):
-        from schemashift._orchestrate import auto_transform, smart_transform  # noqa: PLC0415
-
-        globals()["auto_transform"] = auto_transform
-        globals()["smart_transform"] = smart_transform
-        return globals()[name]
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
