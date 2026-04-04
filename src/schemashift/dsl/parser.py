@@ -363,7 +363,7 @@ class _Parser:
         return MethodCall(obj, name, tuple(args))
 
     # atom := NUMBER | STRING | BOOLEAN | NULL | col_ref | when_expr | '(' expression ')'
-    def _atom(self) -> ASTNode:
+    def _atom(self) -> ASTNode:  # noqa: C901
         tok = self._peek()
 
         if tok.type == TT.NUMBER:
