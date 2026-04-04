@@ -37,6 +37,7 @@ __all__ = [
     "ReaderConfig",
     "ReaderError",
     "Registry",
+    "ReviewRejectedError",
     "SchemaShiftError",
     "SchemaValidationError",
     "TargetSchema",
