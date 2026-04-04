@@ -174,7 +174,7 @@ class TestRobustness:
 
     def test_unicode_identifier_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("α"β")')
+            parse_dsl('col("\u03b1"\u03b2")')
 
     def test_random_numbers_only_expression_parses(self) -> None:
         """A plain number literal is valid DSL."""

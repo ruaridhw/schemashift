@@ -39,7 +39,7 @@ from .analysis import collect_col_refs
 from .compiler import compile_dsl
 from .parser import parse_dsl
 
-__all__ = ["parse_dsl", "compile_dsl", "parse_and_compile", "collect_col_refs"]
+__all__ = ["collect_col_refs", "compile_dsl", "parse_and_compile", "parse_dsl"]
 
 
 def parse_and_compile(expression: str) -> pl.Expr:

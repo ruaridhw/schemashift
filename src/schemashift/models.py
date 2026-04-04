@@ -87,7 +87,6 @@ class ColumnMapping(BaseModel):
         return self
 
 
-
 class ReaderConfig(BaseModel):
     """Low-level options passed to the file reader."""
 

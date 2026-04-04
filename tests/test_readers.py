@@ -174,7 +174,7 @@ class TestUnsupportedExtension:
     def test_unknown_extension_raises_unsupported_file_error(self, tmp_path):
         f = tmp_path / "data.feather"
         f.write_text("dummy")
-        with pytest.raises(UnsupportedFileError, match=".feather"):
+        with pytest.raises(UnsupportedFileError, match=r"\.feather"):
             read_file(f)
 
     def test_no_extension_raises_unsupported_file_error(self, tmp_path):
