@@ -5,10 +5,11 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from schemashift.errors import AmbiguousFormatError, FormatDetectionError
+from schemashift.errors import AmbiguousFormatError, DSLSyntaxError, FormatDetectionError
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.orchestration import auto_transform
 from schemashift.registry import DictRegistry
-from schemashift.transform import auto_transform, dry_run, transform, validate_config
+from schemashift.transform import dry_run, transform, validate_config
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -99,6 +100,14 @@ class TestTransformExprMapping:
         )
         df = transform(NUMBERS_CSV, config).collect()
         assert df["sum_col"].to_list() == pytest.approx([12.0, 24.0, 36.0])
+
+    def test_invalid_dsl_syntax_propagates_as_syntax_error(self) -> None:
+        config = FormatConfig(
+            name="bad_expr",
+            columns=[ColumnMapping(target="sum_col", expr='col("x"')],
+        )
+        with pytest.raises(DSLSyntaxError):
+            transform(NUMBERS_CSV, config).collect()
 
 
 # ---------------------------------------------------------------------------

@@ -18,10 +18,11 @@ from schemashift.errors import (
     ReviewRejectedError,
 )
 from schemashift.models import FormatConfig
+from schemashift.orchestration import auto_transform
 from schemashift.registry import FileSystemRegistry
-from schemashift.transform import auto_transform, validate_config
 from schemashift.transform import dry_run as _dry_run
 from schemashift.transform import transform as _transform
+from schemashift.transform import validate_config
 
 _CONFIG_PATH_TYPE = click.Path(exists=True, file_okay=True, readable=True, path_type=Path)
 
