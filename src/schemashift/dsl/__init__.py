@@ -35,10 +35,11 @@ Expression Reference
 
 import polars as pl
 
+from .analysis import collect_col_refs
 from .compiler import compile_dsl
 from .parser import parse_dsl
 
-__all__ = ["parse_dsl", "compile_dsl", "parse_and_compile"]
+__all__ = ["parse_dsl", "compile_dsl", "parse_and_compile", "collect_col_refs"]
 
 
 def parse_and_compile(expression: str) -> pl.Expr:
