@@ -32,6 +32,12 @@ jobs:
       - name: typos
         run: uv run typos
 
+      - name: ty
+        run: uv run ty check src
+
+      - name: bandit
+        run: uv run bandit -r src -c pyproject.toml
+
   test:
     name: Test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

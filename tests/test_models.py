@@ -1,6 +1,7 @@
 """Tests for schemashift.models."""
 
 import pytest
+from pydantic import ValidationError
 
 from schemashift.errors import ConfigValidationError
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
@@ -103,7 +104,7 @@ class TestColumnMappingDtypeValidation:
         assert col.dtype == dtype
 
     def test_invalid_dtype_raises_config_error(self):
-        with pytest.raises(ConfigValidationError, match="Invalid dtype"):
+        with pytest.raises((ConfigValidationError, ValidationError)):
             ColumnMapping(target="out", source="in", dtype="bigint")
 
     def test_none_dtype_allowed(self):

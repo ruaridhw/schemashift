@@ -144,16 +144,16 @@ def load_default_llm() -> Any:
     foundry_resource = os.getenv("FOUNDRY_RESOURCE")
     if foundry_key and foundry_resource:
         model_name = os.getenv("MODEL_NAME", "claude-haiku-4-5")
-        return ChatAnthropic(
-            model=model_name,
-            api_key=foundry_key,
-            base_url=f"https://{foundry_resource}.services.ai.azure.com/anthropic",
-        )  # ty: ignore[missing-argument, unknown-argument]
+        return ChatAnthropic(  # ty: ignore[missing-argument]
+            model=model_name,  # ty: ignore[unknown-argument]
+            api_key=foundry_key,  # ty: ignore[unknown-argument]
+            base_url=f"https://{foundry_resource}.services.ai.azure.com/anthropic",  # ty: ignore[unknown-argument]
+        )
 
     if os.getenv("ANTHROPIC_API_KEY"):
-        return ChatAnthropic(
-            model="claude-haiku-4-5-20251001", temperature=0
-        )  # ty: ignore[missing-argument, unknown-argument]
+        return ChatAnthropic(  # ty: ignore[missing-argument]
+            model="claude-haiku-4-5-20251001", temperature=0  # ty: ignore[unknown-argument]
+        )
 
     raise ValueError(
         "No LLM API key found. Set FOUNDRY_API_KEY + FOUNDRY_RESOURCE (Azure AI Foundry) or ANTHROPIC_API_KEY."
