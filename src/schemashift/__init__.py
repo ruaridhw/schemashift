@@ -16,17 +16,12 @@ from schemashift.errors import (
 )
 from schemashift.llm import load_default_llm
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.orchestration import auto_transform, smart_transform
 from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
 from schemashift.schema import get_schema, get_schema_path
 from schemashift.target_schema import TargetSchema
-from schemashift.transform import (
-    auto_transform,
-    dry_run,
-    smart_transform,
-    transform,
-    validate_config,
-)
+from schemashift.transform import dry_run, transform, validate_config
 
 __all__ = [
     "get_schema",
