@@ -207,8 +207,7 @@ def build_prompt(
     separator_row = "| " + " | ".join("---" for _ in headers) + " |"
     parts.append(header_row)
     parts.append(separator_row)
-    for row in sample_df.rows():
-        parts.append("| " + " | ".join(str(v) for v in row) + " |")
+    parts.extend("| " + " | ".join(str(v) for v in row) + " |" for row in sample_df.rows())
 
     # Source columns with dtypes
     parts.append("\n## Source File Columns")
@@ -222,8 +221,7 @@ def build_prompt(
             f"The following are example configs that map to the same "
             f"'{target_schema.name}' target schema:"
         )
-        for ex in example_configs:
-            parts.append(ex.model_dump_json(indent=2))
+        parts.extend(ex.model_dump_json(indent=2) for ex in example_configs)
 
     # Additional user-provided context
     if user_prompt:
