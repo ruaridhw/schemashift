@@ -207,14 +207,15 @@ class TestFileSystemRegistryLoadSchema:
         assert schema is not None
         assert schema.name == "my_schema"
 
-    def test_returns_none_when_multiple_schemas_and_no_name(self, tmp_path: Path) -> None:
+    def test_raises_when_multiple_schemas_and_no_name(self, tmp_path: Path) -> None:
         schemas_dir = tmp_path / "schemas"
         schemas_dir.mkdir()
         (schemas_dir / "schema_a.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
         (schemas_dir / "schema_b.yaml").write_text(_OTHER_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        assert reg.load_schema() is None
+        with pytest.raises(ValueError, match="Multiple schemas found"):
+            reg.load_schema()
 
     def test_loads_named_schema_yaml(self, tmp_path: Path) -> None:
         schemas_dir = tmp_path / "schemas"

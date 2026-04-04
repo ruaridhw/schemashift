@@ -35,6 +35,10 @@ class Registry(ABC):
         Returns True if the config existed and was removed, False otherwise.
         """
 
+    def load_schema(self, name: str | None = None) -> "TargetSchema | None":
+        """Load a target schema associated with this registry, if supported."""
+        return None
+
 
 class DictRegistry(Registry):
     """In-memory registry suitable for testing and embedded use."""
@@ -108,25 +112,36 @@ class FileSystemRegistry(Registry):
 
         If *name* is provided, loads ``{schemas_dir}/{name}.yaml`` (falling
         back to ``.yml``).  If *name* is ``None`` and exactly one schema file
-        exists, returns it.  Returns ``None`` if the ``schemas/`` directory
+        exists, returns it. Returns ``None`` if the ``schemas/`` directory
         does not exist, is empty, or the named file is not found.
+
+        Raises:
+            ValueError: If multiple schemas exist and no explicit name is given.
         """
         from schemashift.target_schema import TargetSchema
 
-        schemas_dir = self._path / "schemas"
-        if not schemas_dir.exists():
+        path = _resolve_schema_path(self._path / "schemas", name)
+        if path is None:
             return None
+        return TargetSchema.from_yaml(path)
 
-        if name is not None:
-            path = schemas_dir / f"{name}.yaml"
-            if path.exists():
-                return TargetSchema.from_yaml(path)
-            path = schemas_dir / f"{name}.yml"
-            if path.exists():
-                return TargetSchema.from_yaml(path)
-            return None
 
-        yamls = list(schemas_dir.glob("*.yaml")) + list(schemas_dir.glob("*.yml"))
-        if len(yamls) == 1:
-            return TargetSchema.from_yaml(yamls[0])
+def _resolve_schema_path(schemas_dir: Path, name: str | None = None) -> Path | None:
+    """Resolve a schema file path inside a ``schemas`` directory."""
+    if not schemas_dir.exists():
         return None
+
+    if name is not None:
+        for suffix in (".yaml", ".yml"):
+            path = schemas_dir / f"{name}{suffix}"
+            if path.exists():
+                return path
+        return None
+
+    yamls = sorted(schemas_dir.glob("*.yaml")) + sorted(schemas_dir.glob("*.yml"))
+    if not yamls:
+        return None
+    if len(yamls) > 1:
+        names = [path.name for path in yamls]
+        raise ValueError(f"Multiple schemas found in '{schemas_dir}': {names}. Use an explicit schema name.")
+    return yamls[0]
