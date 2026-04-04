@@ -103,8 +103,8 @@ class TestColumnMappingDtypeValidation:
         col = ColumnMapping(target="out", source="in", dtype=dtype)
         assert col.dtype == dtype
 
-    def test_invalid_dtype_raises_config_error(self):
-        with pytest.raises((ConfigValidationError, ValidationError)):
+    def test_invalid_dtype_raises_validation_error(self):
+        with pytest.raises(ValidationError):
             ColumnMapping(target="out", source="in", dtype="bigint")
 
     def test_none_dtype_allowed(self):
