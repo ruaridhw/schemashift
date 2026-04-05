@@ -41,20 +41,21 @@ def cli() -> None:
 def transform(file: str, config: Path | None, registry: str | None, output: str | None) -> None:
     """Transform a file using a config or auto-detect from registry."""
     try:
+        file_path = Path(file)
         if config is not None:
             fmt_config = _load_format_config(config)
         elif registry is not None:
-            reg = FileSystemRegistry(registry)
-            fmt_config = _detect_config(file, reg)
+            reg = FileSystemRegistry(Path(registry))
+            fmt_config = _detect_config(file_path, reg)
             if fmt_config is None:
-                columns = read_header(file)
+                columns = read_header(file_path)
                 raise FormatDetectionError(
                     f"No registered config matches the columns found in '{file}'. Columns present: {columns}"
                 )
         else:
             raise click.UsageError("Provide either --config or --registry.")
 
-        lf = _transform(file, fmt_config)
+        lf = _transform(file_path, fmt_config)
         if output is not None:
             _sink_output(lf, output)
             click.echo(f"Written to '{output}'.")
@@ -114,7 +115,7 @@ def validate(config_path: Path) -> None:
     help="Additional context for the LLM (e.g. column units, timestamp formats).",
 )
 def generate(
-    file: str | Path,
+    file: str,
     target_schema: str | None,
     output: str | None,
     registry: str | None,
@@ -129,15 +130,16 @@ def generate(
     (Azure AI Foundry) to be set in the environment.
     """
     try:
+        file_path = Path(file)
         schema = _resolve_schema(target_schema, registry)
 
         # Try to load LangChain LLM from environment
         llm = _load_default_llm()
 
-        reg = FileSystemRegistry(registry) if registry else None
+        reg = FileSystemRegistry(Path(registry)) if registry else None
 
         config = generate_config(
-            path=file,
+            path=file_path,
             target_schema=schema,
             llm=llm,
             format_name=name,
@@ -149,7 +151,7 @@ def generate(
             click.echo("\nGenerated config:")
             click.echo(config.model_dump_json(indent=2))
 
-            sample = _transform(file, config).limit(5).collect()
+            sample = _transform(file_path, config).limit(5).collect()
             click.echo("\nSample output (first 5 rows):")
             click.echo(str(sample))
 
@@ -221,11 +223,11 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
     from schemashift.target_schema import TargetSchema  # noqa: PLC0415
 
     if target_schema_path is not None:
-        return TargetSchema.from_yaml(target_schema_path)
+        return TargetSchema.from_yaml(Path(target_schema_path))
 
     if registry_path is not None:
         try:
-            schema = FileSystemRegistry(registry_path).load_schema()
+            schema = FileSystemRegistry(Path(registry_path)).load_schema()
         except ValueError as exc:
             raise click.UsageError(str(exc)) from exc
         if schema is not None:
