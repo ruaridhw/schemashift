@@ -3,7 +3,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from schemashift.readers import read_header
 
@@ -258,6 +258,6 @@ def _sink_output(lf: pl.LazyFrame, output: str) -> None:
     elif ext == ".parquet":
         lf.sink_parquet(out_path)
     elif ext == ".json":
-        lf.collect().write_json(out_path)  # ty: ignore[unresolved-attribute]
+        cast("pl.DataFrame", lf.collect()).write_json(out_path)
     else:
         raise click.UsageError(f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json.")
