@@ -195,7 +195,7 @@ def schema(output: str | None) -> None:
 def list_configs(registry: str) -> None:
     """List all registered configs."""
     try:
-        reg = FileSystemRegistry(registry)
+        reg = FileSystemRegistry(Path(registry))
         configs = reg.list_configs()
         if not configs:
             click.echo("No configs registered.")

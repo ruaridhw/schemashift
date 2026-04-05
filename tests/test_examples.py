@@ -185,7 +185,7 @@ class TestAutoDetection:
 
     def test_filesystem_registry_with_examples(self) -> None:
         examples_dir = EXAMPLES / "configs"
-        reg = FileSystemRegistry(str(examples_dir))
+        reg = FileSystemRegistry(examples_dir)
         configs = reg.list_configs()
         names = {c.name for c in configs}
         assert "camstar_lot_movement" in names
