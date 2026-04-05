@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def smart_transform(
-    path: str | Path,
+    path: Path,
     registry: Registry,
     target_schema: "TargetSchema | None" = None,
     llm: "BaseChatModel | None" = None,
@@ -86,7 +86,7 @@ def smart_transform(
 
 
 def _detect_config(
-    path: str | Path,
+    path: Path,
     registry: Registry,
     reader_config: ReaderConfig | None = None,
 ) -> FormatConfig | None:
@@ -96,7 +96,7 @@ def _detect_config(
 
 
 def _resolve_config(
-    path: str | Path,
+    path: Path,
     registry: Registry,
     target_schema: "TargetSchema | None",
     llm: "BaseChatModel | None",
@@ -122,7 +122,7 @@ def _resolve_config(
     from schemashift.llm import generate_config  # noqa: PLC0415
 
     generated = generate_config(
-        path=str(path),
+        path=path,
         target_schema=target_schema,
         llm=llm,
         example_configs=example_configs,
@@ -137,7 +137,7 @@ def _resolve_config(
 
 
 def _review_generated_config(
-    path: str | Path,
+    path: Path,
     config: FormatConfig,
     review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None,
 ) -> FormatConfig:

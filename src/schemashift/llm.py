@@ -47,7 +47,7 @@ class LangChainLLMBackend:
             raise ImportError("langchain is not installed. Run: pip install 'schemashift[llm]'") from exc
 
         inferred_name = str(schema["format_name"])
-        path = str(schema["path"])
+        path = Path(schema["path"])
         result_box: list[dict[str, Any]] = []
 
         @tool
@@ -230,7 +230,7 @@ def build_prompt(
 
 
 def generate_config(
-    path: str | Path,
+    path: Path,
     target_schema: TargetSchema,
     llm: "LLMBackend | Any",
     example_configs: list[FormatConfig] | None = None,

@@ -16,7 +16,7 @@ from schemashift.readers import read_file
 
 
 def transform(
-    path: str | Path,
+    path: Path,
     config: FormatConfig,
     n_rows: int | None = None,
 ) -> pl.DataFrame:
@@ -42,7 +42,7 @@ def transform(
 
 
 def _transform(
-    path: str | Path,
+    path: Path,
     config: FormatConfig,
 ) -> pl.LazyFrame:
     """Internal: apply a FormatConfig and return a LazyFrame (not collected).

@@ -12,7 +12,7 @@ from .models import ReaderConfig
 _EXCEL_EXTENSIONS: frozenset[str] = frozenset({".xlsx", ".xls"})
 
 
-def read_file(path: str | Path, config: ReaderConfig | None = None) -> pl.LazyFrame:
+def read_file(path: Path, config: ReaderConfig | None = None) -> pl.LazyFrame:
     """Read a file into a LazyFrame based on its extension.
 
     Supported extensions: .csv, .tsv, .xlsx, .xls, .parquet, .json
@@ -52,7 +52,7 @@ def read_file(path: str | Path, config: ReaderConfig | None = None) -> pl.LazyFr
         raise ReaderError(f"Failed to read file '{path}': {exc}") from exc
 
 
-def read_header(path: str | Path, config: ReaderConfig | None = None) -> list[str]:
+def read_header(path: Path, config: ReaderConfig | None = None) -> list[str]:
     """Read only the column names from a file (useful for format detection).
 
     Args:

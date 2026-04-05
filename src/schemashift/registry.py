@@ -65,8 +65,8 @@ class FileSystemRegistry(Registry):
     Each config is persisted as ``{directory}/{name}.json``.
     """
 
-    def __init__(self, path: str | Path) -> None:
-        self._path = Path(path)
+    def __init__(self, path: Path) -> None:
+        self._path = path
         self._path.mkdir(parents=True, exist_ok=True)
 
     def _config_path(self, name: str) -> Path:
