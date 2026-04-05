@@ -111,18 +111,17 @@ Save this as `configs/camstar_mes.json`.
 registry = ss.FileSystemRegistry("./configs/")
 config = registry.get("camstar_mes")
 
-result = ss.transform("camstar_mes.csv", config)
-df = result.collect()   # polars.DataFrame
+df = ss.transform("camstar_mes.csv", config)   # polars.DataFrame
 ```
 
-`transform()` returns a `polars.LazyFrame` — no data is loaded until you call `.collect()`.
+Pass `n_rows=N` to preview the first N rows without reading the whole file.
 
 ### 4. Auto-detect the format
 
 Once you have multiple configs registered (e.g. `camstar_mes`, `fabx_tsv`, `sap_erp`), let schemashift pick the right one based on column fingerprinting:
 
 ```python
-result = ss.auto_transform("camstar_mes.csv", registry=registry)
+df = ss.smart_transform("camstar_mes.csv", registry=registry)
 ```
 
 The detector matches on the file's column names. If two configs both match, `AmbiguousFormatError` is raised — add more columns to one of the configs to disambiguate.
@@ -130,9 +129,7 @@ The detector matches on the file's column names. If two configs both match, `Amb
 ### 5. Validate the output
 
 ```python
-schema.validate_lazy(result)   # checks column names and dtypes
-df = result.collect()
-schema.validate_eager(df)      # also checks for nulls in required columns
+schema.validate_eager(df)   # checks column names, dtypes, and required-column nulls
 ```
 
 ## Next steps
