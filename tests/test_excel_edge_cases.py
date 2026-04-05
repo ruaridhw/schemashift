@@ -44,7 +44,7 @@ class TestExcelBasic:
                 ColumnMapping(target="user_name", source="name"),
             ],
         )
-        result = transform(path, config).collect()
+        result = transform(path, config)
         assert set(result.columns) == {"user_id", "user_name"}
         assert len(result) == 2
         assert result["user_name"].to_list() == ["Alice", "Bob"]
@@ -72,7 +72,7 @@ class TestExcelBasic:
                 ColumnMapping(target="user_name", source="name"),
             ],
         )
-        result = transform(path, config).collect()
+        result = transform(path, config)
         assert set(result.columns) == {"user_id", "user_name"}
         assert len(result) == 2
 
@@ -100,7 +100,7 @@ class TestExcelBasic:
                 ColumnMapping(target="wfrs", source="wafer_count"),
             ],
         )
-        result = transform(str(path), config).collect()
+        result = transform(str(path), config)
         assert set(result.columns) == {"lot", "wfrs"}
         assert len(result) == 2
         assert result["lot"].to_list() == ["L001", "L002"]
@@ -121,7 +121,7 @@ class TestExcelBasic:
             reader=ReaderConfig(sheet_name=0),  # first sheet by index
             columns=[ColumnMapping(target="a", source="col_a")],
         )
-        result = transform(str(path), config).collect()
+        result = transform(str(path), config)
         assert result["a"].to_list() == ["x"]
 
 
@@ -211,7 +211,7 @@ class TestExcelFromPRD:
                 ColumnMapping(target="data_source", constant="smartfactory"),
             ],
         )
-        result = transform(str(path), config).collect()
+        result = transform(str(path), config)
         assert "lot_id" in result.columns
         assert "hold_flag" in result.columns
         assert "data_source" in result.columns

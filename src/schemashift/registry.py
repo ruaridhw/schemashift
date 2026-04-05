@@ -4,13 +4,10 @@ import json
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from schemashift.errors import ConfigValidationError
 from schemashift.models import FormatConfig
-
-if TYPE_CHECKING:
-    from schemashift.target_schema import TargetSchema
+from schemashift.target_schema import TargetSchema
 
 
 class Registry(ABC):
@@ -68,8 +65,8 @@ class FileSystemRegistry(Registry):
     Each config is persisted as ``{directory}/{name}.json``.
     """
 
-    def __init__(self, path: str | Path) -> None:
-        self._path = Path(path)
+    def __init__(self, path: Path) -> None:
+        self._path = path
         self._path.mkdir(parents=True, exist_ok=True)
 
     def _config_path(self, name: str) -> Path:
@@ -118,8 +115,6 @@ class FileSystemRegistry(Registry):
         Raises:
             ValueError: If multiple schemas exist and no explicit name is given.
         """
-        from schemashift.target_schema import TargetSchema
-
         path = _resolve_schema_path(self._path / "schemas", name)
         if path is None:
             return None

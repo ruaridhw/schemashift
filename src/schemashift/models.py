@@ -1,11 +1,12 @@
 """Pydantic v2 models for schemashift configuration."""
 
+import json
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .dsl import collect_col_refs, parse_dsl
-from .dtypes import DTYPE_MAP
+from .dtypes import DTYPE_MAP, DType
 from .errors import ConfigValidationError
 
 # Sentinel for optional Any-typed fields where None is a valid user-supplied value.
@@ -42,7 +43,7 @@ class ColumnMapping(BaseModel):
         default=_UNSET,
         description="Literal constant broadcast to all rows. Mutually exclusive with 'source' and 'expr'.",
     )
-    dtype: str | None = Field(
+    dtype: DType | None = Field(
         default=None,
         description="Target Polars dtype to cast this column to after mapping.",
         json_schema_extra=_DTYPE_JSON_SCHEMA,
@@ -66,8 +67,6 @@ class ColumnMapping(BaseModel):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to omit sentinel-valued fields from the JSON output."""
-        import json
-
         return json.dumps(self.model_dump(**kwargs))
 
     @model_validator(mode="after")
@@ -85,13 +84,6 @@ class ColumnMapping(BaseModel):
                 f"'constant' must be set, but {set_fields} were provided."
             )
         return self
-
-    @field_validator("dtype")
-    @classmethod
-    def _validate_dtype(cls, value: str | None) -> str | None:
-        if value is not None and value not in DTYPE_MAP:
-            raise ConfigValidationError(f"Invalid dtype '{value}'. Valid values are: {sorted(DTYPE_MAP)}")
-        return value
 
 
 class ReaderConfig(BaseModel):
@@ -129,8 +121,6 @@ class FormatConfig(BaseModel):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to serialise ColumnMapping fields respecting the _UNSET sentinel."""
-        import json
-
         indent = kwargs.pop("indent", None)
         return json.dumps(self.model_dump(**kwargs), indent=indent)
 

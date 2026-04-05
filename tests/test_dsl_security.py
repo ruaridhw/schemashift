@@ -173,8 +173,17 @@ class TestRobustness:
             parse_dsl(",")
 
     def test_unicode_identifier_raises_dsl_syntax_error(self) -> None:
+        """Unicode characters outside quoted strings are rejected by the tokenizer.
+
+        The IDENT regex ``[A-Za-z_][A-Za-z0-9_]*`` is ASCII-only, so any
+        non-ASCII character in a keyword or identifier position (e.g. a
+        Cyrillic homoglyph of a method name) hits the ``Unexpected character``
+        branch and raises :exc:`DSLSyntaxError` before it can reach the
+        allowlist check.  This means homoglyph/homograph attacks cannot bypass
+        the method allowlist.
+        """
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("α"β")')
+            parse_dsl('col("\u03b1"\u03b2")')
 
     def test_random_numbers_only_expression_parses(self) -> None:
         """A plain number literal is valid DSL."""
@@ -211,9 +220,7 @@ class TestRobustness:
 class TestCastValidation:
     def test_invalid_cast_type_rejected(self) -> None:
         """Unknown cast target type raises DSLSyntaxError (caught during compile)."""
-        from schemashift.errors import DSLSyntaxError as DslSE
-
-        with pytest.raises(DslSE):
+        with pytest.raises(DSLSyntaxError):
             parse_and_compile('col("x").cast("pickle")')
 
     def test_valid_cast_types_accepted(self) -> None:

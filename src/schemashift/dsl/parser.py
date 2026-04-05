@@ -196,7 +196,8 @@ def tokenize(expression: str) -> list[Token]:
         elif kind == "STRING":
             tokens.append(Token(TT.STRING, _unescape_string(text), pos))
         else:
-            assert kind is not None
+            if kind is None:  # pragma: no cover
+                raise DSLSyntaxError(f"Unexpected token at position {pos}", expression=expression, position=pos)
             tt = _TT_MAP[kind]
             tokens.append(Token(tt, text, pos))
         pos = m.end()
@@ -349,21 +350,20 @@ class _Parser:
             args = self._args() if not self._match(TT.RPAREN) else ()
             self._expect(TT.RPAREN, hint=f"Expected ')' to close '{full_method}(...'")
             return MethodCall(obj, full_method, tuple(args))
-        else:
-            # Direct method
-            if not _is_allowed_method("", name):
-                raise DSLSyntaxError(
-                    f"Unknown method '{name}'",
-                    expression=self._expr,
-                    position=name_tok.pos,
-                )
-            self._expect(TT.LPAREN, hint=f"Expected '(' after '{name}'")
-            args = self._args() if not self._match(TT.RPAREN) else ()
-            self._expect(TT.RPAREN, hint=f"Expected ')' to close '{name}(...'")
-            return MethodCall(obj, name, tuple(args))
+        # Direct method
+        if not _is_allowed_method("", name):
+            raise DSLSyntaxError(
+                f"Unknown method '{name}'",
+                expression=self._expr,
+                position=name_tok.pos,
+            )
+        self._expect(TT.LPAREN, hint=f"Expected '(' after '{name}'")
+        args = self._args() if not self._match(TT.RPAREN) else ()
+        self._expect(TT.RPAREN, hint=f"Expected ')' to close '{name}(...'")
+        return MethodCall(obj, name, tuple(args))
 
     # atom := NUMBER | STRING | BOOLEAN | NULL | col_ref | when_expr | '(' expression ')'
-    def _atom(self) -> ASTNode:
+    def _atom(self) -> ASTNode:  # noqa: C901
         tok = self._peek()
 
         if tok.type == TT.NUMBER:

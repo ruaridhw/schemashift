@@ -5,11 +5,14 @@ a ``polars.Expr`` that can be used directly inside ``df.select()``,
 ``df.with_columns()``, etc.
 """
 
+from typing import cast
+
 import polars as pl
 
-from schemashift.dtypes import DTYPE_MAP
+from schemashift.dtypes import DTYPE_MAP, DType
 from schemashift.errors import DSLRuntimeError, DSLSyntaxError
 
+from ._lookups import TABLES
 from .ast_nodes import (
     ASTNode,
     BinaryOp,
@@ -135,7 +138,6 @@ def compile_dsl(node: ASTNode) -> pl.Expr:  # noqa: C901 (complex but intentiona
             return pl.coalesce([compile_dsl(e) for e in exprs])
 
         case Lookup(expr, table_name):
-            from schemashift.dsl._lookups import TABLES
 
             if table_name not in TABLES:
                 raise DSLSyntaxError(
@@ -147,7 +149,6 @@ def compile_dsl(node: ASTNode) -> pl.Expr:  # noqa: C901 (complex but intentiona
             return compile_dsl(expr).replace(list(table.keys()), list(table.values()))
 
         case CustomLookup(expr, mapping, base_table):
-            from schemashift.dsl._lookups import TABLES
 
             if base_table is not None:
                 if base_table not in TABLES:
@@ -197,7 +198,7 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
                     expression="",
                     position=-1,
                 )
-            return base.cast(DTYPE_MAP[type_str])
+            return base.cast(DTYPE_MAP[cast("DType", type_str)])
 
         case "fill_null":
             _expect_arity(method, args, 1)
@@ -303,13 +304,17 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
                 return base.dt.timestamp("ms")
             _expect_arity(method, args, 1)
             unit = _literal_str(args[0], method)
-            if unit not in ("ms", "us", "ns"):
-                raise DSLSyntaxError(
-                    f"dt.timestamp() unit must be 'ms', 'us', or 'ns', got {unit!r}",
-                    expression="",
-                    position=-1,
-                )
-            return base.dt.timestamp(unit)
+            if unit == "ms":
+                return base.dt.timestamp("ms")
+            if unit == "us":
+                return base.dt.timestamp("us")
+            if unit == "ns":
+                return base.dt.timestamp("ns")
+            raise DSLSyntaxError(
+                f"dt.timestamp() unit must be 'ms', 'us', or 'ns', got {unit!r}",
+                expression="",
+                position=-1,
+            )
 
         case _:
             raise DSLRuntimeError(f"Unsupported method: {method!r}")

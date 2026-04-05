@@ -3,7 +3,6 @@
 import os
 
 import pytest
-
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage
 
@@ -18,6 +17,7 @@ def pytest_collection_modifyitems(config, items):
             for item in items:
                 if item.get_closest_marker("llm"):
                     item.add_marker(skip)
+
 
 class FakeToolCallingModel(FakeMessagesListChatModel):
     """Minimal fake LLM that supports tool-calling for use with create_agent."""

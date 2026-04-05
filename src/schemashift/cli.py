@@ -3,7 +3,9 @@
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+
+from schemashift.readers import read_header
 
 if TYPE_CHECKING:
     from schemashift.target_schema import TargetSchema
@@ -17,12 +19,11 @@ from schemashift.errors import (
     FormatDetectionError,
     ReviewRejectedError,
 )
+from schemashift.llm import generate_config, load_default_llm
 from schemashift.models import FormatConfig
-from schemashift.orchestration import auto_transform
+from schemashift.orchestration import _detect_config
 from schemashift.registry import FileSystemRegistry
-from schemashift.transform import dry_run as _dry_run
-from schemashift.transform import transform as _transform
-from schemashift.transform import validate_config
+from schemashift.transform import _transform, validate_config
 
 _CONFIG_PATH_TYPE = click.Path(exists=True, file_okay=True, readable=True, path_type=Path)
 
@@ -40,15 +41,21 @@ def cli() -> None:
 def transform(file: str, config: Path | None, registry: str | None, output: str | None) -> None:
     """Transform a file using a config or auto-detect from registry."""
     try:
+        file_path = Path(file)
         if config is not None:
             fmt_config = _load_format_config(config)
-            lf = _transform(file, fmt_config)
         elif registry is not None:
-            reg = FileSystemRegistry(registry)
-            lf = auto_transform(file, reg)
+            reg = FileSystemRegistry(Path(registry))
+            fmt_config = _detect_config(file_path, reg)
+            if fmt_config is None:
+                columns = read_header(file_path)
+                raise FormatDetectionError(
+                    f"No registered config matches the columns found in '{file}'. Columns present: {columns}"
+                )
         else:
             raise click.UsageError("Provide either --config or --registry.")
 
+        lf = _transform(file_path, fmt_config)
         if output is not None:
             _sink_output(lf, output)
             click.echo(f"Written to '{output}'.")
@@ -83,21 +90,6 @@ def validate(config_path: Path) -> None:
         click.echo(f"Config '{fmt_config.name}' is valid.")
 
 
-@cli.command(name="dry-run")
-@click.argument("config_path", type=_CONFIG_PATH_TYPE)
-@click.option("--sample", "-s", required=True, help="Sample data file.")
-@click.option("--rows", "-n", default=10, show_default=True, help="Number of rows to process.")
-def dry_run(config_path: Path, sample: str, rows: int) -> None:
-    """Dry-run a config against sample data."""
-    try:
-        fmt_config = _load_format_config(config_path)
-        df = _dry_run(fmt_config, sample, n_rows=rows)
-        click.echo(str(df))
-    except Exception as exc:
-        click.echo(f"Error: {exc}", err=True)
-        sys.exit(1)
-
-
 @cli.command()
 @click.argument("file")
 @click.option(
@@ -122,7 +114,7 @@ def dry_run(config_path: Path, sample: str, rows: int) -> None:
     default=None,
     help="Additional context for the LLM (e.g. column units, timestamp formats).",
 )
-def generate(  # noqa: PLR0913
+def generate(
     file: str,
     target_schema: str | None,
     output: str | None,
@@ -138,17 +130,16 @@ def generate(  # noqa: PLR0913
     (Azure AI Foundry) to be set in the environment.
     """
     try:
-        from schemashift.llm import generate_config
-
+        file_path = Path(file)
         schema = _resolve_schema(target_schema, registry)
 
         # Try to load LangChain LLM from environment
         llm = _load_default_llm()
 
-        reg = FileSystemRegistry(registry) if registry else None
+        reg = FileSystemRegistry(Path(registry)) if registry else None
 
         config = generate_config(
-            path=file,
+            path=file_path,
             target_schema=schema,
             llm=llm,
             format_name=name,
@@ -160,9 +151,7 @@ def generate(  # noqa: PLR0913
             click.echo("\nGenerated config:")
             click.echo(config.model_dump_json(indent=2))
 
-            from schemashift.transform import dry_run
-
-            sample = dry_run(config, file, n_rows=5)
+            sample = _transform(file_path, config).limit(5).collect()
             click.echo("\nSample output (first 5 rows):")
             click.echo(str(sample))
 
@@ -206,7 +195,7 @@ def schema(output: str | None) -> None:
 def list_configs(registry: str) -> None:
     """List all registered configs."""
     try:
-        reg = FileSystemRegistry(registry)
+        reg = FileSystemRegistry(Path(registry))
         configs = reg.list_configs()
         if not configs:
             click.echo("No configs registered.")
@@ -231,14 +220,14 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
     2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_schema`.
     3. Otherwise raise :class:`click.UsageError`.
     """
-    from schemashift.target_schema import TargetSchema
+    from schemashift.target_schema import TargetSchema  # noqa: PLC0415
 
     if target_schema_path is not None:
-        return TargetSchema.from_yaml(target_schema_path)
+        return TargetSchema.from_yaml(Path(target_schema_path))
 
     if registry_path is not None:
         try:
-            schema = FileSystemRegistry(registry_path).load_schema()
+            schema = FileSystemRegistry(Path(registry_path)).load_schema()
         except ValueError as exc:
             raise click.UsageError(str(exc)) from exc
         if schema is not None:
@@ -248,8 +237,6 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
 
 
 def _load_default_llm() -> Any:
-    from schemashift.llm import load_default_llm
-
     try:
         return load_default_llm()
     except (ImportError, ValueError) as exc:
@@ -263,7 +250,7 @@ def _load_format_config(path: Path) -> FormatConfig:
 
 
 def _sink_output(lf: pl.LazyFrame, output: str) -> None:
-    """Stream a LazyFrame to a file using Polars sink methods where available."""
+    """Stream a LazyFrame to a file using Polars sink methods."""
     out_path = Path(output)
     ext = out_path.suffix.lower()
     if ext == ".csv":
@@ -271,6 +258,6 @@ def _sink_output(lf: pl.LazyFrame, output: str) -> None:
     elif ext == ".parquet":
         lf.sink_parquet(out_path)
     elif ext == ".json":
-        lf.collect().write_json(out_path)
+        cast("pl.DataFrame", lf.collect()).write_json(out_path)
     else:
         raise click.UsageError(f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json.")

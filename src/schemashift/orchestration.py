@@ -10,7 +10,7 @@ from schemashift.errors import FormatDetectionError, ReviewRejectedError
 from schemashift.models import FormatConfig, ReaderConfig
 from schemashift.readers import read_header
 from schemashift.registry import Registry
-from schemashift.transform import dry_run, transform
+from schemashift.transform import _transform, transform
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -18,37 +18,8 @@ if TYPE_CHECKING:
     from schemashift.target_schema import TargetSchema
 
 
-def auto_transform(
-    path: str | Path,
-    registry: Registry,
-    reader_config: ReaderConfig | None = None,
-) -> pl.LazyFrame:
-    """Auto-detect the format from the registry and transform the file.
-
-    Args:
-        path: Path to the source file.
-        registry: Registry to search for a matching config.
-        reader_config: Optional reader configuration used when reading the file
-            header for format detection.
-
-    Returns:
-        A transformed :class:`polars.LazyFrame`.
-
-    Raises:
-        FormatDetectionError: When no config matches the file's columns.
-        AmbiguousFormatError: When multiple configs match.
-    """
-    config = _detect_config(path, registry, reader_config)
-    if config is None:
-        columns = read_header(path, reader_config)
-        raise FormatDetectionError(
-            f"No registered config matches the columns found in '{path}'. Columns present: {columns}"
-        )
-    return transform(path, config)
-
-
 def smart_transform(
-    path: str | Path,
+    path: Path,
     registry: Registry,
     target_schema: "TargetSchema | None" = None,
     llm: "BaseChatModel | None" = None,
@@ -58,7 +29,7 @@ def smart_transform(
     max_retries: int = 2,
     n_sample_rows: int = 15,
     reader_config: ReaderConfig | None = None,
-) -> pl.LazyFrame:
+) -> pl.DataFrame:
     """Full detect-or-generate flow.
 
     1. Try auto-detect from registry.
@@ -80,7 +51,7 @@ def smart_transform(
         reader_config: Optional reader configuration forwarded to all file reads.
 
     Returns:
-        Transformed pl.LazyFrame.
+        Transformed :class:`polars.DataFrame`.
 
     Raises:
         FormatDetectionError: No match and no LLM.
@@ -100,10 +71,13 @@ def smart_transform(
         n_sample_rows=n_sample_rows,
         reader_config=reader_config,
     )
-    lf = transform(path, config)
+    lf = _transform(path, config)
     if target_schema is not None:
         target_schema.validate_lazy(lf)
-    return lf
+    df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
+    if target_schema is not None:
+        target_schema.validate_eager(df)
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -112,17 +86,17 @@ def smart_transform(
 
 
 def _detect_config(
-    path: str | Path,
+    path: Path,
     registry: Registry,
     reader_config: ReaderConfig | None = None,
 ) -> FormatConfig | None:
-    from schemashift.detection import detect_format
+    from schemashift.detection import detect_format  # noqa: PLC0415
 
     return detect_format(read_header(path, reader_config), registry)
 
 
 def _resolve_config(
-    path: str | Path,
+    path: Path,
     registry: Registry,
     target_schema: "TargetSchema | None",
     llm: "BaseChatModel | None",
@@ -145,10 +119,10 @@ def _resolve_config(
     if target_schema is None:
         raise ValueError("target_schema is required for LLM config generation")
 
-    from schemashift.llm import generate_config
+    from schemashift.llm import generate_config  # noqa: PLC0415
 
     generated = generate_config(
-        path=str(path),
+        path=path,
         target_schema=target_schema,
         llm=llm,
         example_configs=example_configs,
@@ -163,14 +137,14 @@ def _resolve_config(
 
 
 def _review_generated_config(
-    path: str | Path,
+    path: Path,
     config: FormatConfig,
     review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None,
 ) -> FormatConfig:
     if review_fn is None:
         return config
 
-    sample_df = dry_run(config, path, n_rows=10)
+    sample_df = transform(path, config, n_rows=10)
     reviewed = review_fn(config, sample_df)
     if reviewed is None:
         raise ReviewRejectedError("Config was rejected by review_fn")
