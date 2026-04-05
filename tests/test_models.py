@@ -1,5 +1,7 @@
 """Tests for schemashift.models."""
 
+import json
+
 import pytest
 from pydantic import ValidationError
 
@@ -61,8 +63,6 @@ class TestColumnMappingValidation:
         assert col.constant is None
 
     def test_constant_none_round_trips_json(self) -> None:
-        import json
-
         config = FormatConfig(
             name="test",
             columns=[ColumnMapping(target="flag", constant=None)],
