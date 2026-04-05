@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import openpyxl
 import polars as pl
 import pytest
 
@@ -37,9 +38,6 @@ def parquet_file(tmp_path: Path) -> Path:
 @pytest.fixture
 def xlsx_file(tmp_path: Path) -> Path:
     """Create a small Excel fixture programmatically (requires fastexcel/openpyxl)."""
-    pytest.importorskip("openpyxl")
-    import openpyxl  # noqa: PLC0415
-
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Sheet1"
