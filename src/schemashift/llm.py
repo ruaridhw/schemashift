@@ -40,9 +40,9 @@ class LangChainLLMBackend:
 
     def generate(self, prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
         try:
-            from langchain.agents import create_agent
-            from langchain_core.messages import HumanMessage
-            from langchain_core.tools import tool
+            from langchain.agents import create_agent  # noqa: PLC0415
+            from langchain_core.messages import HumanMessage  # noqa: PLC0415
+            from langchain_core.tools import tool  # noqa: PLC0415
         except ImportError as exc:
             raise ImportError("langchain is not installed. Run: pip install 'schemashift[llm]'") from exc
 

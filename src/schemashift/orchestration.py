@@ -116,7 +116,7 @@ def _detect_config(
     registry: Registry,
     reader_config: ReaderConfig | None = None,
 ) -> FormatConfig | None:
-    from schemashift.detection import detect_format
+    from schemashift.detection import detect_format  # noqa: PLC0415
 
     return detect_format(read_header(path, reader_config), registry)
 
@@ -145,7 +145,7 @@ def _resolve_config(
     if target_schema is None:
         raise ValueError("target_schema is required for LLM config generation")
 
-    from schemashift.llm import generate_config
+    from schemashift.llm import generate_config  # noqa: PLC0415
 
     generated = generate_config(
         path=str(path),

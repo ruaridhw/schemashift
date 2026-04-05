@@ -1,5 +1,6 @@
 """Pydantic v2 models for schemashift configuration."""
 
+import json
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -66,8 +67,6 @@ class ColumnMapping(BaseModel):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to omit sentinel-valued fields from the JSON output."""
-        import json
-
         return json.dumps(self.model_dump(**kwargs))
 
     @model_validator(mode="after")
@@ -122,8 +121,6 @@ class FormatConfig(BaseModel):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to serialise ColumnMapping fields respecting the _UNSET sentinel."""
-        import json
-
         indent = kwargs.pop("indent", None)
         return json.dumps(self.model_dump(**kwargs), indent=indent)
 
