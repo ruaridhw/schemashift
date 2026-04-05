@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from schemashift.readers import read_header
+
 if TYPE_CHECKING:
     from schemashift.target_schema import TargetSchema
 
@@ -19,11 +21,9 @@ from schemashift.errors import (
 )
 from schemashift.llm import generate_config, load_default_llm
 from schemashift.models import FormatConfig
-from schemashift.orchestration import auto_transform
+from schemashift.orchestration import _detect_config
 from schemashift.registry import FileSystemRegistry
-from schemashift.transform import dry_run as _dry_run
-from schemashift.transform import transform as _transform
-from schemashift.transform import validate_config
+from schemashift.transform import _transform, validate_config
 
 _CONFIG_PATH_TYPE = click.Path(exists=True, file_okay=True, readable=True, path_type=Path)
 
@@ -43,13 +43,18 @@ def transform(file: str, config: Path | None, registry: str | None, output: str 
     try:
         if config is not None:
             fmt_config = _load_format_config(config)
-            lf = _transform(file, fmt_config)
         elif registry is not None:
             reg = FileSystemRegistry(registry)
-            lf = auto_transform(file, reg)
+            fmt_config = _detect_config(file, reg)
+            if fmt_config is None:
+                columns = read_header(file)
+                raise FormatDetectionError(
+                    f"No registered config matches the columns found in '{file}'. Columns present: {columns}"
+                )
         else:
             raise click.UsageError("Provide either --config or --registry.")
 
+        lf = _transform(file, fmt_config)
         if output is not None:
             _sink_output(lf, output)
             click.echo(f"Written to '{output}'.")
@@ -84,21 +89,6 @@ def validate(config_path: Path) -> None:
         click.echo(f"Config '{fmt_config.name}' is valid.")
 
 
-@cli.command(name="dry-run")
-@click.argument("config_path", type=_CONFIG_PATH_TYPE)
-@click.option("--sample", "-s", required=True, help="Sample data file.")
-@click.option("--rows", "-n", default=10, show_default=True, help="Number of rows to process.")
-def dry_run(config_path: Path, sample: str, rows: int) -> None:
-    """Dry-run a config against sample data."""
-    try:
-        fmt_config = _load_format_config(config_path)
-        df = _dry_run(fmt_config, sample, n_rows=rows)
-        click.echo(str(df))
-    except Exception as exc:
-        click.echo(f"Error: {exc}", err=True)
-        sys.exit(1)
-
-
 @cli.command()
 @click.argument("file")
 @click.option(
@@ -123,8 +113,8 @@ def dry_run(config_path: Path, sample: str, rows: int) -> None:
     default=None,
     help="Additional context for the LLM (e.g. column units, timestamp formats).",
 )
-def generate(  # noqa: PLR0913
-    file: str,
+def generate(
+    file: str | Path,
     target_schema: str | None,
     output: str | None,
     registry: str | None,
@@ -159,7 +149,7 @@ def generate(  # noqa: PLR0913
             click.echo("\nGenerated config:")
             click.echo(config.model_dump_json(indent=2))
 
-            sample = _dry_run(config, file, n_rows=5)
+            sample = _transform(file, config).limit(5).collect()
             click.echo("\nSample output (first 5 rows):")
             click.echo(str(sample))
 
@@ -258,7 +248,7 @@ def _load_format_config(path: Path) -> FormatConfig:
 
 
 def _sink_output(lf: pl.LazyFrame, output: str) -> None:
-    """Stream a LazyFrame to a file using Polars sink methods where available."""
+    """Stream a LazyFrame to a file using Polars sink methods."""
     out_path = Path(output)
     ext = out_path.suffix.lower()
     if ext == ".csv":

@@ -18,35 +18,6 @@ if TYPE_CHECKING:
     from schemashift.target_schema import TargetSchema
 
 
-def auto_transform(
-    path: str | Path,
-    registry: Registry,
-    reader_config: ReaderConfig | None = None,
-) -> pl.DataFrame:
-    """Auto-detect the format from the registry and transform the file.
-
-    Args:
-        path: Path to the source file.
-        registry: Registry to search for a matching config.
-        reader_config: Optional reader configuration used when reading the file
-            header for format detection.
-
-    Returns:
-        A transformed :class:`polars.DataFrame`.
-
-    Raises:
-        FormatDetectionError: When no config matches the file's columns.
-        AmbiguousFormatError: When multiple configs match.
-    """
-    config = _detect_config(path, registry, reader_config)
-    if config is None:
-        columns = read_header(path, reader_config)
-        raise FormatDetectionError(
-            f"No registered config matches the columns found in '{path}'. Columns present: {columns}"
-        )
-    return _transform(path, config).collect()  # ty: ignore[return-value]
-
-
 def smart_transform(
     path: str | Path,
     registry: Registry,
