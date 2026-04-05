@@ -57,7 +57,9 @@ The DSL is a closed language: string → AST → `polars.Expr`.
 
 - `parser.py` is a hand-written recursive descent parser with explicit allowlists.
 - `ast_nodes.py` defines frozen AST dataclasses.
-- `compiler.py` lowers AST nodes into native Polars expressions.
+- `compiler.py` lowers AST nodes into native Polars expressions. dtype string→Polars type mapping lives in `dtypes.py` as `DTYPE_MAP`.
+- `analysis.py` — `collect_col_refs()` walks an AST to extract all referenced column names.
+- `_lookups.py` — auto-discovers JSON files in `dsl/tables/` and exposes them as `TABLES` (used by `lookup()` / `custom_lookup()` DSL ops).
 
 When adding a DSL operation:
 
@@ -67,11 +69,21 @@ When adding a DSL operation:
 
 Never use `eval()` or introduce arbitrary method dispatch.
 
-### Transform engine
+### Transform engine (`transform.py`)
 
 - `transform(path, config)` returns a `pl.LazyFrame`
 - Avoid materialising data unless `dry_run()` is required or the caller explicitly collects
+- Also exposes `validate_config()` (DSL parse check)
+
+### Orchestration (`orchestration.py`)
+
+- `auto_transform()` detects format from registry and applies it directly
 - `smart_transform()` handles detect-or-generate flow and optional review / auto-registration
+
+### Format detection (`detection.py`)
+
+- `detect_format(file_columns, registry)` scores registered configs by specificity and returns the best match
+- Raises `AmbiguousFormatError` on ties above the minimum score threshold
 
 ### Registry
 
@@ -81,7 +93,7 @@ Never use `eval()` or introduce arbitrary method dispatch.
 
 ### LLM generation
 
-`generate_config()` accepts a LangChain `BaseChatModel`, validates generated JSON, validates DSL syntax, and dry-runs before success.
+`generate_config()` accepts any `LLMBackend` implementation; plain LangChain `BaseChatModel` instances are auto-wrapped in `LangChainLLMBackend`. Validates generated JSON, validates DSL syntax, and dry-runs before success.
 
 ### Target schema
 
@@ -101,12 +113,15 @@ Never use `eval()` or introduce arbitrary method dispatch.
 
 All project-specific errors inherit from `SchemaShiftError`.
 
-Important ones:
-
-- `DSLSyntaxError`
-- `DSLRuntimeError`
-- `AmbiguousFormatError`
-- `LLMGenerationError`
+- `DSLSyntaxError` — parse-time
+- `DSLRuntimeError` — evaluation-time
+- `FormatDetectionError` — base for detection failures; `AmbiguousFormatError` (has `.candidates`) is a subclass
+- `ReviewRejectedError` — raised when a `review_fn` rejects a generated config
+- `LLMGenerationError` — has `.attempts`
+- `ConfigValidationError` — invalid config structure
+- `SchemaValidationError` — output shape doesn't match `TargetSchema`
+- `UnsupportedFileError` — unrecognised file extension
+- `ReaderError` — file read failure
 
 For deeper project-specific guidance, see `CLAUDE.md`.
 

@@ -52,7 +52,9 @@ Three-layer pipeline: string → AST → `polars.Expr`.
 
 - `parser.py` — hand-written recursive descent. Allowlist of methods in `_STR_METHODS`, `_DT_METHODS`, `_DIRECT_METHODS`. Add new ops here first.
 - `ast_nodes.py` — frozen dataclasses (`ColRef`, `BinaryOp`, `MethodCall`, `WhenChain`, `Coalesce`, etc.)
-- `compiler.py` — `compile_dsl()` uses `match/case` to dispatch each node type to a `polars.Expr`. `_CAST_TYPES` maps dtype strings to Polars types.
+- `compiler.py` — `compile_dsl()` uses `match/case` to dispatch each node type to a `polars.Expr`. dtype string→Polars type mapping lives in `dtypes.py` as `DTYPE_MAP`.
+- `analysis.py` — `collect_col_refs()` walks an AST to extract all referenced column names. Used by `FormatConfig.source_columns()`.
+- `_lookups.py` — auto-discovers JSON files in `dsl/tables/` and exposes them as the `TABLES` dict (used by `lookup()` / `custom_lookup()` DSL ops).
 
 To add a new DSL operation: add to the allowlist in `parser.py`, add a case in `compiler.py`, add to `_DSL_REFERENCE` in `llm.py`.
 
@@ -60,9 +62,17 @@ The DSL is a **closed language** — no eval, no arbitrary method calls. The par
 
 ### Transform engine (`transform.py`)
 
-`transform(path, config)` → `pl.LazyFrame`. Never materialises data unless `dry_run()` or the caller calls `.collect()`.
+`transform(path, config)` → `pl.LazyFrame`. Never materialises data unless `dry_run()` or the caller calls `.collect()`. Also exposes `validate_config()` (DSL parse check) and `dry_run()`.
 
-`smart_transform()` is the full detect-or-generate flow: registry hit → apply directly; miss → call `llm.generate_config()` → optional `review_fn` callback → optional `auto_register`.
+### Orchestration (`orchestration.py`)
+
+Higher-level flows built on top of the core transform engine.
+
+`auto_transform()` detects the format from the registry and applies it directly. `smart_transform()` is the full detect-or-generate flow: registry hit → apply directly; miss → call `llm.generate_config()` → optional `review_fn` callback → optional `auto_register`.
+
+### Format detection (`detection.py`)
+
+`detect_format(file_columns, registry)` scores registered configs against the file's column set and returns the best match (or `None`). Configs are ranked by specificity: `len(required_cols) / len(file_cols)`. Raises `AmbiguousFormatError` when multiple configs tie above the minimum score threshold.
 
 ### Registry (`registry.py`)
 
@@ -70,7 +80,7 @@ The DSL is a **closed language** — no eval, no arbitrary method calls. The par
 
 ### LLM generation (`llm.py`)
 
-`generate_config()` accepts a LangChain `BaseChatModel` only (no `llm_fn`). Retry loop (default 2 retries): extract JSON → `FormatConfig.model_validate` → `validate_config` (DSL parse check) → `dry_run`. Each failed attempt is logged at `WARNING` and stored in `LLMGenerationError.attempts`.
+`generate_config()` accepts any `LLMBackend` implementation; plain LangChain `BaseChatModel` instances are auto-wrapped in `LangChainLLMBackend`. Retry loop (default 2 retries): extract JSON → `FormatConfig.model_validate` → `validate_config` (DSL parse check) → `dry_run`. Each failed attempt is logged at `WARNING` and stored in `LLMGenerationError.attempts`.
 
 ### Target schema (`target_schema.py`)
 
@@ -78,7 +88,17 @@ The DSL is a **closed language** — no eval, no arbitrary method calls. The par
 
 ### Error hierarchy
 
-All errors inherit from `SchemaShiftError`. Key ones: `DSLSyntaxError` (parse-time, has `.expression` and `.position`), `DSLRuntimeError` (evaluation-time), `AmbiguousFormatError` (has `.candidates`), `LLMGenerationError` (has `.attempts`).
+All errors inherit from `SchemaShiftError`. Full list:
+
+- `DSLSyntaxError` — parse-time, has `.expression` and `.position`
+- `DSLRuntimeError` — evaluation-time
+- `FormatDetectionError` — base for detection failures; `AmbiguousFormatError` (has `.candidates`) is a subclass
+- `ReviewRejectedError` — raised when a `review_fn` rejects a generated config
+- `LLMGenerationError` — has `.attempts` (list of failed attempt dicts)
+- `ConfigValidationError` — invalid config structure
+- `SchemaValidationError` — output shape doesn't match `TargetSchema`
+- `UnsupportedFileError` — unrecognised file extension
+- `ReaderError` — file read failure
 
 ## Key design constraints
 
