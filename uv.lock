@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1322,13 +1322,13 @@ dependencies = [
     { name = "fastexcel" },
     { name = "polars" },
     { name = "pydantic" },
-    { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
 dev = [
     { name = "black" },
     { name = "hypothesis" },
+    { name = "openpyxl" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -1368,13 +1368,13 @@ requires-dist = [
     { name = "langchain-anthropic", marker = "extra == 'llm'", specifier = ">=1.4,<2" },
     { name = "langchain-core", marker = "extra == 'llm'", specifier = ">=1.2,<2" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=5.0" },
+    { name = "openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.3" },
     { name = "polars", specifier = ">=1.0,<2" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.5" },
     { name = "pydantic", specifier = ">=2.12,<3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1" },
     { name = "python-dotenv", marker = "extra == 'llm'", specifier = ">=1.2,<2" },
-    { name = "pyyaml", specifier = ">=6.0,<7" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=9.1" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=3.9" },
