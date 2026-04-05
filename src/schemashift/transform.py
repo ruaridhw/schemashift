@@ -37,8 +37,8 @@ def transform(
     """
     lf = _transform(path, config)
     if n_rows is not None:
-        return lf.limit(n_rows).collect()  # ty: ignore[return-value]
-    return lf.collect()  # ty: ignore[return-value]
+        return lf.limit(n_rows).collect()  # ty: ignore[invalid-return-type]
+    return lf.collect()  # ty: ignore[invalid-return-type]
 
 
 def _transform(

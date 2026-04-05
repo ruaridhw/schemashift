@@ -258,6 +258,6 @@ def _sink_output(lf: pl.LazyFrame, output: str) -> None:
     elif ext == ".parquet":
         lf.sink_parquet(out_path)
     elif ext == ".json":
-        lf.collect().write_json(out_path)
+        lf.collect().write_json(out_path)  # ty: ignore[unresolved-attribute]
     else:
         raise click.UsageError(f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json.")
