@@ -310,7 +310,7 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
                     expression="",
                     position=-1,
                 )
-            return base.dt.timestamp(unit)
+            return base.dt.timestamp(unit)  # ty: ignore[invalid-argument-type]
 
         case _:
             raise DSLRuntimeError(f"Unsupported method: {method!r}")

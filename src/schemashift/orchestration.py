@@ -74,7 +74,7 @@ def smart_transform(
     lf = _transform(path, config)
     if target_schema is not None:
         target_schema.validate_lazy(lf)
-    df: pl.DataFrame = lf.collect()  # ty: ignore[assignment]
+    df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
     if target_schema is not None:
         target_schema.validate_eager(df)
     return df
