@@ -21,7 +21,7 @@ from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
 from schemashift.schema import get_schema, get_schema_path
 from schemashift.target_schema import TargetSchema
-from schemashift.transform import dry_run, transform, validate_config
+from schemashift.transform import transform, validate_config
 
 __all__ = [
     "AmbiguousFormatError",
@@ -44,7 +44,6 @@ __all__ = [
     "UnsupportedFileError",
     "auto_transform",
     "detect_format",
-    "dry_run",
     "get_schema",
     "get_schema_path",
     "load_default_llm",

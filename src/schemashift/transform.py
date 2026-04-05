@@ -18,26 +18,37 @@ from schemashift.readers import read_file
 def transform(
     path: str | Path,
     config: FormatConfig,
-) -> pl.LazyFrame:
-    """Apply a FormatConfig to a file and return a transformed LazyFrame.
-
-    Steps:
-    1. Read the file using :func:`~schemashift.readers.read_file`.
-    2. Build one Polars expression per ColumnMapping.
-    3. Optionally drop columns not referenced by any mapping.
-    4. Apply dtype casting where specified.
-    5. Apply fill_null where specified.
+    n_rows: int | None = None,
+) -> pl.DataFrame:
+    """Apply a FormatConfig to a file and return the transformed data.
 
     Args:
         path: Path to the source file.
         config: FormatConfig describing how to map columns.
+        n_rows: If given, collect only the first *n_rows* rows (useful for
+            previewing or validating a config without reading the whole file).
 
     Returns:
-        A :class:`polars.LazyFrame` with the transformed columns.
+        A :class:`polars.DataFrame` with the transformed columns.
 
     Raises:
         DSLRuntimeError: When a DSL expression fails to evaluate.
         ReaderError: When the file cannot be read.
+    """
+    lf = _transform(path, config)
+    if n_rows is not None:
+        return lf.limit(n_rows).collect()  # ty: ignore[return-value]
+    return lf.collect()  # ty: ignore[return-value]
+
+
+def _transform(
+    path: str | Path,
+    config: FormatConfig,
+) -> pl.LazyFrame:
+    """Internal: apply a FormatConfig and return a LazyFrame (not collected).
+
+    Used by the CLI for streaming sinks and by orchestration functions that
+    need to validate the schema lazily before collecting.
     """
     lf = read_file(path, config.reader)
     expressions = _build_expressions(config)
@@ -73,25 +84,6 @@ def validate_config(config: FormatConfig) -> list[str]:
             )
 
     return errors
-
-
-def dry_run(config: FormatConfig, path: str | Path, n_rows: int = 10) -> pl.DataFrame:
-    """Apply config to the first *n_rows* of a file and return the result.
-
-    Args:
-        config: FormatConfig to apply.
-        path: Path to the sample file.
-        n_rows: Number of rows to collect.
-
-    Returns:
-        A :class:`polars.DataFrame` containing the transformed rows.
-
-    Raises:
-        Any error raised by :func:`transform` or Polars collection.
-    """
-    lf = transform(path, config)
-    result: pl.DataFrame = lf.limit(n_rows).collect()  # ty: ignore[invalid-assignment]
-    return result
 
 
 # ---------------------------------------------------------------------------

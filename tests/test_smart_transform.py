@@ -63,23 +63,22 @@ class TestRegistryHit:
     def test_uses_registry_when_match(self, sample_csv, schema, matching_config):
         reg = DictRegistry()
         reg.register(matching_config)
-        lf = smart_transform(sample_csv, registry=reg, target_schema=schema)
-        df = lf.collect()
+        df = smart_transform(sample_csv, registry=reg, target_schema=schema)
         assert set(df.columns) == {"student_name", "score", "grade"}
         assert len(df) == 2
 
     def test_works_without_target_schema(self, sample_csv, matching_config):
         reg = DictRegistry()
         reg.register(matching_config)
-        lf = smart_transform(sample_csv, registry=reg)
-        assert "student_name" in lf.collect().columns
+        df = smart_transform(sample_csv, registry=reg)
+        assert "student_name" in df.columns
 
 
 class TestLLMGeneration:
     def test_generates_when_no_match(self, sample_csv, schema):
         reg = DictRegistry()
-        lf = smart_transform(sample_csv, registry=reg, target_schema=schema, llm=make_tool_calling_llm(_valid_config()))
-        assert set(lf.collect().columns) == {"student_name", "score", "grade"}
+        df = smart_transform(sample_csv, registry=reg, target_schema=schema, llm=make_tool_calling_llm(_valid_config()))
+        assert set(df.columns) == {"student_name", "score", "grade"}
 
     def test_auto_registers(self, sample_csv, schema):
         reg = DictRegistry()
@@ -108,7 +107,7 @@ class TestReviewFn:
         def review(cfg, df_sample):
             return FormatConfig(name="reviewed", columns=cfg.columns)
 
-        lf = smart_transform(
+        df = smart_transform(
             sample_csv,
             registry=reg,
             target_schema=schema,
@@ -117,7 +116,7 @@ class TestReviewFn:
             auto_register=True,
         )
         assert reg.get("reviewed") is not None
-        assert len(lf.collect()) == 2
+        assert len(df) == 2
 
     def test_review_fn_rejection(self, sample_csv, schema):
         with pytest.raises(ReviewRejectedError, match="rejected"):

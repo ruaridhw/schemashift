@@ -5,11 +5,9 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from schemashift.errors import AmbiguousFormatError, DSLSyntaxError, FormatDetectionError
-from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
-from schemashift.orchestration import auto_transform
-from schemashift.registry import DictRegistry
-from schemashift.transform import dry_run, transform, validate_config
+from schemashift.errors import DSLSyntaxError
+from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.transform import transform, validate_config
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -40,29 +38,29 @@ def _source_config(drop_unmapped: bool = True) -> FormatConfig:
 class TestTransformSourceMapping:
     def test_basic_source_mapping_renames_columns(self) -> None:
         config = _source_config()
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert "identifier" in df.columns
         assert "customer" in df.columns
 
     def test_basic_source_mapping_row_count(self) -> None:
         config = _source_config()
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert len(df) == 5
 
     def test_basic_source_mapping_values(self) -> None:
         config = _source_config()
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert df["identifier"].to_list() == [1, 2, 3, 4, 5]
         assert df["customer"].to_list() == ["Alice", "Bob", "Carol", "Dave", "Eve"]
 
     def test_drop_unmapped_true_excludes_original_columns(self) -> None:
         config = _source_config(drop_unmapped=True)
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert set(df.columns) == {"identifier", "customer"}
 
     def test_drop_unmapped_false_keeps_original_columns(self) -> None:
         config = _source_config(drop_unmapped=False)
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         # Original columns should still be present alongside mapped ones
         assert "identifier" in df.columns
         assert "customer" in df.columns
@@ -82,7 +80,7 @@ class TestTransformExprMapping:
             name="expr_test",
             columns=[ColumnMapping(target="x_div", expr='col("x") / 10')],
         )
-        df = transform(NUMBERS_CSV, config).collect()
+        df = transform(NUMBERS_CSV, config)
         assert df["x_div"].to_list() == pytest.approx([1.0, 2.0, 3.0])
 
     def test_expr_multiplies_two_columns(self) -> None:
@@ -90,7 +88,7 @@ class TestTransformExprMapping:
             name="mul_test",
             columns=[ColumnMapping(target="product", expr='col("x") * col("y")')],
         )
-        df = transform(NUMBERS_CSV, config).collect()
+        df = transform(NUMBERS_CSV, config)
         assert df["product"].to_list() == pytest.approx([20.0, 80.0, 180.0])
 
     def test_expr_arithmetic_result_correct(self) -> None:
@@ -98,7 +96,7 @@ class TestTransformExprMapping:
             name="arith",
             columns=[ColumnMapping(target="sum_col", expr='col("x") + col("y")')],
         )
-        df = transform(NUMBERS_CSV, config).collect()
+        df = transform(NUMBERS_CSV, config)
         assert df["sum_col"].to_list() == pytest.approx([12.0, 24.0, 36.0])
 
     def test_invalid_dsl_syntax_propagates_as_syntax_error(self) -> None:
@@ -107,7 +105,7 @@ class TestTransformExprMapping:
             columns=[ColumnMapping(target="sum_col", expr='col("x"')],
         )
         with pytest.raises(DSLSyntaxError):
-            transform(NUMBERS_CSV, config).collect()
+            transform(NUMBERS_CSV, config)
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +122,7 @@ class TestTransformConstantMapping:
                 ColumnMapping(target="tag", constant="processed"),
             ],
         )
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert df["tag"].to_list() == ["processed"] * 5
 
     def test_constant_integer(self) -> None:
@@ -137,7 +135,7 @@ class TestTransformConstantMapping:
                 ColumnMapping(target="version", constant=42),
             ],
         )
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert df["version"].to_list() == [42] * 5
 
     def test_constant_none_broadcasts_nulls(self, tmp_path: Path) -> None:
@@ -147,7 +145,7 @@ class TestTransformConstantMapping:
             name="test",
             columns=[ColumnMapping(target="flag", constant=None)],
         )
-        result = transform(str(csv), config).collect()
+        result = transform(str(csv), config)
         assert result["flag"].is_null().all()
 
 
@@ -162,7 +160,7 @@ class TestTransformDtypeCasting:
             name="cast_test",
             columns=[ColumnMapping(target="id_str", source="id", dtype="str")],
         )
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert df["id_str"].dtype == pl.Utf8
 
     def test_cast_to_float64(self) -> None:
@@ -170,7 +168,7 @@ class TestTransformDtypeCasting:
             name="cast_float",
             columns=[ColumnMapping(target="id_float", source="id", dtype="float64")],
         )
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert df["id_float"].dtype == pl.Float64
         assert df["id_float"].to_list() == pytest.approx([1.0, 2.0, 3.0, 4.0, 5.0])
 
@@ -179,7 +177,7 @@ class TestTransformDtypeCasting:
             name="cast_int32",
             columns=[ColumnMapping(target="id_i32", source="id", dtype="int32")],
         )
-        df = transform(SAMPLE_CSV, config).collect()
+        df = transform(SAMPLE_CSV, config)
         assert df["id_i32"].dtype == pl.Int32
 
 
@@ -194,7 +192,7 @@ class TestTransformFillNull:
             name="fillna_test",
             columns=[ColumnMapping(target="value_filled", source="value", fillna=0)],
         )
-        df = transform(NULLABLE_CSV, config).collect()
+        df = transform(NULLABLE_CSV, config)
         # Row 2 (index 1) has a null value → should be filled with 0
         filled_values = df["value_filled"].to_list()
         assert filled_values[1] == pytest.approx(0)
@@ -256,24 +254,24 @@ class TestValidateConfig:
 # ---------------------------------------------------------------------------
 
 
-class TestDryRun:
-    def test_dry_run_returns_dataframe(self) -> None:
+class TestTransformNRows:
+    def test_transform_returns_dataframe(self) -> None:
         config = FormatConfig(
             name="dr_test",
             columns=[ColumnMapping(target="id_out", source="id")],
         )
-        df = dry_run(config, SAMPLE_CSV, n_rows=3)
+        df = transform(SAMPLE_CSV, config, n_rows=3)
         assert isinstance(df, pl.DataFrame)
 
-    def test_dry_run_respects_n_rows(self) -> None:
+    def test_n_rows_limits_output(self) -> None:
         config = FormatConfig(
             name="dr_rows",
             columns=[ColumnMapping(target="id_out", source="id")],
         )
-        df = dry_run(config, SAMPLE_CSV, n_rows=2)
+        df = transform(SAMPLE_CSV, config, n_rows=2)
         assert len(df) == 2
 
-    def test_dry_run_correct_columns(self) -> None:
+    def test_n_rows_none_returns_all_rows(self) -> None:
         config = FormatConfig(
             name="dr_cols",
             columns=[
@@ -281,77 +279,14 @@ class TestDryRun:
                 ColumnMapping(target="name_out", source="name"),
             ],
         )
-        df = dry_run(config, SAMPLE_CSV)
+        df = transform(SAMPLE_CSV, config)
         assert set(df.columns) == {"id_out", "name_out"}
+        assert len(df) == 5
 
-    def test_dry_run_values(self) -> None:
+    def test_n_rows_values(self) -> None:
         config = FormatConfig(
             name="dr_vals",
             columns=[ColumnMapping(target="id_out", source="id")],
         )
-        df = dry_run(config, SAMPLE_CSV, n_rows=3)
+        df = transform(SAMPLE_CSV, config, n_rows=3)
         assert df["id_out"].to_list() == [1, 2, 3]
-
-
-# ---------------------------------------------------------------------------
-# Auto transform
-# ---------------------------------------------------------------------------
-
-
-class TestAutoTransform:
-    def test_auto_transform_detects_and_applies_config(self) -> None:
-        reg = DictRegistry()
-        config = FormatConfig(
-            name="auto_cfg",
-            columns=[
-                ColumnMapping(target="id_out", source="id"),
-                ColumnMapping(target="name_out", source="name"),
-            ],
-        )
-        reg.register(config)
-        df = auto_transform(SAMPLE_CSV, reg).collect()
-        assert set(df.columns) == {"id_out", "name_out"}
-        assert len(df) == 5
-
-    def test_auto_transform_raises_when_no_match(self) -> None:
-        reg = DictRegistry()
-        config = FormatConfig(
-            name="unmatched",
-            columns=[ColumnMapping(target="out", source="nonexistent_col_xyz")],
-        )
-        reg.register(config)
-
-        with pytest.raises(FormatDetectionError):
-            auto_transform(SAMPLE_CSV, reg)
-
-    def test_auto_transform_raises_when_ambiguous(self) -> None:
-        reg = DictRegistry()
-        reg.register(
-            FormatConfig(
-                name="cfg1",
-                columns=[ColumnMapping(target="out", source="id")],
-            )
-        )
-        reg.register(
-            FormatConfig(
-                name="cfg2",
-                columns=[ColumnMapping(target="out", source="id")],
-            )
-        )
-
-        with pytest.raises(AmbiguousFormatError):
-            auto_transform(SAMPLE_CSV, reg)
-
-    def test_auto_transform_forwards_reader_config(self, tmp_path: Path) -> None:
-        csv = tmp_path / "data.csv"
-        csv.write_text("metadata\na,b\n1,2\n")
-        config = FormatConfig(
-            name="test",
-            reader=ReaderConfig(skip_rows=1),
-            columns=[ColumnMapping(target="a", source="a"), ColumnMapping(target="b", source="b")],
-        )
-        reg = DictRegistry()
-        reg.register(config)
-        result = auto_transform(str(csv), reg, reader_config=ReaderConfig(skip_rows=1)).collect()
-        assert list(result.columns) == ["a", "b"]
-        assert result.shape == (1, 2)
