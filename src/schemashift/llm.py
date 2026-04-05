@@ -13,7 +13,7 @@ from .errors import LLMGenerationError
 from .models import FormatConfig, ReaderConfig
 from .readers import read_file
 from .target_schema import TargetSchema
-from .transform import dry_run, validate_config
+from .transform import transform, validate_config
 
 _log = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class LangChainLLMBackend:
                 return f"DSL errors:\n{error}"
 
             try:
-                dry_run(config, path, n_rows=5)
+                transform(path, config, n_rows=5)
             except Exception as exc:
                 error = str(exc)
                 self.attempts.append({"response": data, "error": error})
@@ -230,7 +230,7 @@ def build_prompt(
 
 
 def generate_config(
-    path: str,
+    path: str | Path,
     target_schema: TargetSchema,
     llm: "LLMBackend | Any",
     example_configs: list[FormatConfig] | None = None,

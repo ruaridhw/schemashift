@@ -10,7 +10,7 @@ from schemashift.errors import FormatDetectionError, ReviewRejectedError
 from schemashift.models import FormatConfig, ReaderConfig
 from schemashift.readers import read_header
 from schemashift.registry import Registry
-from schemashift.transform import dry_run, transform
+from schemashift.transform import _transform, transform
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -22,7 +22,7 @@ def auto_transform(
     path: str | Path,
     registry: Registry,
     reader_config: ReaderConfig | None = None,
-) -> pl.LazyFrame:
+) -> pl.DataFrame:
     """Auto-detect the format from the registry and transform the file.
 
     Args:
@@ -32,7 +32,7 @@ def auto_transform(
             header for format detection.
 
     Returns:
-        A transformed :class:`polars.LazyFrame`.
+        A transformed :class:`polars.DataFrame`.
 
     Raises:
         FormatDetectionError: When no config matches the file's columns.
@@ -44,7 +44,7 @@ def auto_transform(
         raise FormatDetectionError(
             f"No registered config matches the columns found in '{path}'. Columns present: {columns}"
         )
-    return transform(path, config)
+    return _transform(path, config).collect()  # ty: ignore[return-value]
 
 
 def smart_transform(
@@ -58,7 +58,7 @@ def smart_transform(
     max_retries: int = 2,
     n_sample_rows: int = 15,
     reader_config: ReaderConfig | None = None,
-) -> pl.LazyFrame:
+) -> pl.DataFrame:
     """Full detect-or-generate flow.
 
     1. Try auto-detect from registry.
@@ -80,7 +80,7 @@ def smart_transform(
         reader_config: Optional reader configuration forwarded to all file reads.
 
     Returns:
-        Transformed pl.LazyFrame.
+        Transformed :class:`polars.DataFrame`.
 
     Raises:
         FormatDetectionError: No match and no LLM.
@@ -100,10 +100,13 @@ def smart_transform(
         n_sample_rows=n_sample_rows,
         reader_config=reader_config,
     )
-    lf = transform(path, config)
+    lf = _transform(path, config)
     if target_schema is not None:
         target_schema.validate_lazy(lf)
-    return lf
+    df: pl.DataFrame = lf.collect()  # ty: ignore[assignment]
+    if target_schema is not None:
+        target_schema.validate_eager(df)
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +173,7 @@ def _review_generated_config(
     if review_fn is None:
         return config
 
-    sample_df = dry_run(config, path, n_rows=10)
+    sample_df = transform(path, config, n_rows=10)
     reviewed = review_fn(config, sample_df)
     if reviewed is None:
         raise ReviewRejectedError("Config was rejected by review_fn")
