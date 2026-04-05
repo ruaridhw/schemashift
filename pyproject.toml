@@ -119,6 +119,7 @@ extend-ignore-re = ["(?Rm)^.*#\\s*ignore:typo$"]
 
 [tool.typos.default.extend-words]
 promis = "promis"
+analyze = "analyze"
 
 [dependency-groups]
 dev = [
