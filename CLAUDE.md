@@ -2,14 +2,27 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Preferred tools
+
+- Use `rg` for fast text and file search instead of slower defaults like `grep` or `find` when available.
+- Use `rtk` when reading large files, listing directories, summarising command output, or running noisy commands that would otherwise waste context.
+- Good defaults in this repo:
+  - `rg "pattern" src tests`
+  - `rg --files src tests docs`
+  - `rtk read README.md`
+  - `rtk tree src`
+  - `rtk pytest`
+  - `rtk ruff check src tests`
+
 ## Commands
 
 ```bash
-uv run pytest                        # all tests with coverage
-uv run pytest tests/test_dsl_parser.py -v   # single file
-uv run pytest -k "test_name"         # single test by name
-uv run ruff check src/               # lint
-pre-commit run                       # lint + format (run after staging changes)
+rtk uv run pytest                              # all tests with coverage
+rtk uv run pytest tests/test_dsl_parser.py -v  # single file
+rtk uv run pytest -k "test_name"               # single test by name
+rtk uv run ruff check src/                     # lint
+rtk uv run black src/ tests/             # formatting check
+pre-commit run                                 # lint + format (run after staging changes)
 ```
 
 ## Architecture

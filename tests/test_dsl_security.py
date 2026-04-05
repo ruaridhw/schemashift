@@ -237,3 +237,18 @@ class TestCastValidation:
         for t in valid_types:
             result = parse_and_compile(f'col("x").cast("{t}")')
             assert isinstance(result, pl.Expr), f"Expected Expr for cast({t!r})"
+
+
+# ---------------------------------------------------------------------------
+# not keyword
+# ---------------------------------------------------------------------------
+
+
+class TestNotKeyword:
+    def test_not_produces_safe_expr(self) -> None:
+        result = parse_and_compile('not col("x").is_null()')
+        assert isinstance(result, pl.Expr)
+
+    def test_double_not_produces_safe_expr(self) -> None:
+        result = parse_and_compile('not not col("x").is_null()')
+        assert isinstance(result, pl.Expr)

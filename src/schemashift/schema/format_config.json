@@ -4,7 +4,6 @@
       "description": "Describes how to produce one output column.",
       "properties": {
         "constant": {
-          "default": null,
           "description": "Literal constant broadcast to all rows. Mutually exclusive with 'source' and 'expr'.",
           "title": "Constant"
         },
@@ -61,7 +60,6 @@
           "title": "Expr"
         },
         "fillna": {
-          "default": null,
           "description": "Fill-value applied to nulls after mapping.",
           "title": "Fillna"
         },
@@ -125,7 +123,7 @@
             }
           ],
           "default": null,
-          "description": "Excel sheet name (string) or 1-based index (int). Ignored for non-Excel files.",
+          "description": "Excel sheet name (string) or 0-based index (int). Ignored for non-Excel files.",
           "title": "Sheet Name"
         },
         "skip_rows": {

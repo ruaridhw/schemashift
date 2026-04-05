@@ -2,34 +2,13 @@
 
 import polars as pl
 import pytest
-from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
-from langchain_core.messages import AIMessage
+from conftest import make_tool_calling_llm
 
-from schemashift.errors import FormatDetectionError
+from schemashift.errors import FormatDetectionError, ReviewRejectedError
 from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.orchestration import smart_transform
 from schemashift.registry import DictRegistry
 from schemashift.target_schema import TargetColumn, TargetSchema
-from schemashift.transform import smart_transform
-
-
-class FakeToolCallingModel(FakeMessagesListChatModel):
-    """Minimal fake LLM that supports tool-calling for use with create_agent."""
-
-    def bind_tools(self, tools, **kwargs):
-        return self
-
-
-def _make_llm(config_args: dict) -> FakeToolCallingModel:
-    """Return a fake LLM that submits *config_args* via submit_format_config then finishes."""
-    return FakeToolCallingModel(
-        responses=[
-            AIMessage(
-                content="",
-                tool_calls=[{"id": "tc1", "name": "submit_format_config", "args": config_args}],
-            ),
-            AIMessage(content="Done."),
-        ]
-    )
 
 
 @pytest.fixture
@@ -99,7 +78,7 @@ class TestRegistryHit:
 class TestLLMGeneration:
     def test_generates_when_no_match(self, sample_csv, schema):
         reg = DictRegistry()
-        lf = smart_transform(sample_csv, registry=reg, target_schema=schema, llm=_make_llm(_valid_config()))
+        lf = smart_transform(sample_csv, registry=reg, target_schema=schema, llm=make_tool_calling_llm(_valid_config()))
         assert set(lf.collect().columns) == {"student_name", "score", "grade"}
 
     def test_auto_registers(self, sample_csv, schema):
@@ -108,7 +87,7 @@ class TestLLMGeneration:
             sample_csv,
             registry=reg,
             target_schema=schema,
-            llm=_make_llm(_valid_config()),
+            llm=make_tool_calling_llm(_valid_config()),
             auto_register=True,
         )
         assert reg.get("gen") is not None
@@ -119,7 +98,7 @@ class TestLLMGeneration:
 
     def test_raises_without_schema(self, sample_csv):
         with pytest.raises(ValueError, match="target_schema"):
-            smart_transform(sample_csv, registry=DictRegistry(), llm=_make_llm(_valid_config()))
+            smart_transform(sample_csv, registry=DictRegistry(), llm=make_tool_calling_llm(_valid_config()))
 
 
 class TestReviewFn:
@@ -133,7 +112,7 @@ class TestReviewFn:
             sample_csv,
             registry=reg,
             target_schema=schema,
-            llm=_make_llm(_valid_config()),
+            llm=make_tool_calling_llm(_valid_config()),
             review_fn=review,
             auto_register=True,
         )
@@ -141,11 +120,11 @@ class TestReviewFn:
         assert len(lf.collect()) == 2
 
     def test_review_fn_rejection(self, sample_csv, schema):
-        with pytest.raises(FormatDetectionError, match="rejected"):
+        with pytest.raises(ReviewRejectedError, match="rejected"):
             smart_transform(
                 sample_csv,
                 registry=DictRegistry(),
                 target_schema=schema,
-                llm=_make_llm(_valid_config()),
+                llm=make_tool_calling_llm(_valid_config()),
                 review_fn=lambda cfg, df: None,
             )

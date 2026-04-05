@@ -6,7 +6,7 @@ import polars as pl
 import yaml
 from pydantic import BaseModel, Field
 
-from .dtypes import DTYPE_MAP, DType, polars_dtype
+from .dtypes import DType, polars_dtype
 from .errors import SchemaValidationError
 
 
@@ -97,4 +97,4 @@ def _dtypes_compatible(actual: pl.DataType, expected: type[pl.DataType]) -> bool
     return isinstance(actual, expected)
 
 
-__all__ = ["DTYPE_MAP", "DType", "polars_dtype", "TargetColumn", "TargetSchema"]
+__all__ = ["TargetColumn", "TargetSchema"]
