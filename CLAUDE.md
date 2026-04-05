@@ -30,7 +30,7 @@ pre-commit run                                 # lint + format (run after stagin
 schemashift transforms tabular files into a canonical schema using declarative JSON/YAML configs. The pipeline is:
 
 ```
-File → Reader → LazyFrame → Transform Engine → LazyFrame
+File → Reader → LazyFrame → Transform Engine → DataFrame
                     ↑
               Registry / Detector
                     ↑ (miss)
@@ -62,13 +62,13 @@ The DSL is a **closed language** — no eval, no arbitrary method calls. The par
 
 ### Transform engine (`transform.py`)
 
-`transform(path, config)` → `pl.LazyFrame`. Never materialises data unless `dry_run()` or the caller calls `.collect()`. Also exposes `validate_config()` (DSL parse check) and `dry_run()`.
+`transform(path, config, n_rows=None)` → `pl.DataFrame`. Pass `n_rows` to limit rows (replaces the old `dry_run()`). Internally uses `_transform()` which returns a `LazyFrame` — collected before returning. Also exposes `validate_config()` (DSL parse check).
 
 ### Orchestration (`orchestration.py`)
 
 Higher-level flows built on top of the core transform engine.
 
-`auto_transform()` detects the format from the registry and applies it directly. `smart_transform()` is the full detect-or-generate flow: registry hit → apply directly; miss → call `llm.generate_config()` → optional `review_fn` callback → optional `auto_register`.
+`smart_transform()` is the full detect-or-generate flow: registry hit → apply directly; miss → call `llm.generate_config()` → optional `review_fn` callback → optional `auto_register`. Returns `pl.DataFrame`.
 
 ### Format detection (`detection.py`)
 
@@ -80,11 +80,11 @@ Higher-level flows built on top of the core transform engine.
 
 ### LLM generation (`llm.py`)
 
-`generate_config()` accepts any `LLMBackend` implementation; plain LangChain `BaseChatModel` instances are auto-wrapped in `LangChainLLMBackend`. Retry loop (default 2 retries): extract JSON → `FormatConfig.model_validate` → `validate_config` (DSL parse check) → `dry_run`. Each failed attempt is logged at `WARNING` and stored in `LLMGenerationError.attempts`.
+`generate_config()` accepts any `LLMBackend` implementation; plain LangChain `BaseChatModel` instances are auto-wrapped in `LangChainLLMBackend`. Retry loop (default 2 retries): extract JSON → `FormatConfig.model_validate` → `validate_config` (DSL parse check) → `transform(n_rows=5)`. Each failed attempt is logged at `WARNING` and stored in `LLMGenerationError.attempts`.
 
 ### Target schema (`target_schema.py`)
 
-`TargetSchema` is the source of truth for output shape. `validate_lazy()` checks column names/dtypes against the `LazyFrame` schema without collecting. `validate_eager()` also checks for nulls in required columns.
+`TargetSchema` is the source of truth for output shape. `validate_lazy()` checks column names/dtypes against the internal `LazyFrame` before collection (used by `smart_transform`). `validate_eager()` also checks for nulls in required columns.
 
 ### Error hierarchy
 
@@ -110,7 +110,7 @@ All errors inherit from `SchemaShiftError`. Full list:
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **schemashift** (1192 symbols, 4074 relationships, 99 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **schemashift** (1209 symbols, 4035 relationships, 90 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
@@ -180,7 +180,7 @@ Before completing any code modification task, verify:
 
 ## Keeping the Index Fresh
 
-After committing code changes, the GitNexus index becomes stale. Re-run analyse to update it:
+After committing code changes, the GitNexus index becomes stale. Re-run analyze to update it:
 
 ```bash
 npx gitnexus analyze
@@ -192,7 +192,7 @@ If the index previously included embeddings, preserve them by adding `--embeddin
 npx gitnexus analyze --embeddings
 ```
 
-To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyse without `--embeddings` will delete any previously generated embeddings.**
+To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.embeddings` field shows the count (0 means no embeddings). **Running analyze without `--embeddings` will delete any previously generated embeddings.**
 
 > Claude Code users: A PostToolUse hook handles this automatically after `git commit` and `git merge`.
 
