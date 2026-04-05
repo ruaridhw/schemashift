@@ -145,29 +145,6 @@ class TestTransformCommand:
 
 
 # ---------------------------------------------------------------------------
-# dry-run command
-# ---------------------------------------------------------------------------
-
-
-class TestDryRunCommand:
-    def test_dry_run_prints_dataframe(self, runner: CliRunner) -> None:
-        result = runner.invoke(
-            cli,
-            ["dry-run", SALES_CONFIG, "--sample", SAMPLE_CSV],
-        )
-        assert result.exit_code == 0
-        # Output should include column names
-        assert "identifier" in result.output or "customer" in result.output
-
-    def test_dry_run_respects_rows_option(self, runner: CliRunner) -> None:
-        result = runner.invoke(
-            cli,
-            ["dry-run", SALES_CONFIG, "--sample", SAMPLE_CSV, "--rows", "2"],
-        )
-        assert result.exit_code == 0
-
-
-# ---------------------------------------------------------------------------
 # _resolve_schema helper
 # ---------------------------------------------------------------------------
 
@@ -392,7 +369,7 @@ class TestGenerateCommand:
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
             patch("schemashift.cli.generate_config", return_value=mock_config),
-            patch("schemashift.cli._dry_run", return_value=fake_sample),
+            patch("schemashift.cli._transform", return_value=fake_sample.lazy()),
         ):
             result = runner.invoke(
                 cli,
@@ -416,7 +393,7 @@ class TestGenerateCommand:
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
             patch("schemashift.cli.generate_config", return_value=mock_config),
-            patch("schemashift.cli._dry_run", return_value=fake_sample),
+            patch("schemashift.cli._transform", return_value=fake_sample.lazy()),
         ):
             result = runner.invoke(
                 cli,

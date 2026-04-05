@@ -16,7 +16,7 @@ from schemashift.errors import (
 )
 from schemashift.llm import load_default_llm
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
-from schemashift.orchestration import auto_transform, smart_transform
+from schemashift.orchestration import smart_transform
 from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
 from schemashift.schema import get_schema, get_schema_path
@@ -42,7 +42,6 @@ __all__ = [
     "SchemaValidationError",
     "TargetSchema",
     "UnsupportedFileError",
-    "auto_transform",
     "detect_format",
     "get_schema",
     "get_schema_path",
