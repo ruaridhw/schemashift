@@ -1,53 +1,32 @@
-"""AST analysis helpers for the schemashift DSL."""
+"""DSL analysis helpers — extract column references from a DSL expression string."""
 
-from schemashift.dsl.ast_nodes import (
-    ASTNode,
-    BinaryOp,
-    Coalesce,
-    ColRef,
-    CustomLookup,
-    Literal,
-    Lookup,
-    MethodCall,
-    UnaryOp,
-    WhenChain,
-    WhenClause,
-)
+from __future__ import annotations
+
+import ast as stdlib_ast
+
+import lark
+
+from .parser import parse
 
 
-def collect_col_refs(node: ASTNode) -> set[str]:
-    """Collect every column name referenced by ``col(...)`` calls in an AST."""
-    refs: set[str] = set()
-    _visit(node, refs)
-    return refs
+def collect_col_refs(expr: str) -> set[str]:
+    """Return the set of source column names referenced in *expr*.
+
+    Parses *expr* and walks the resulting parse tree to collect every
+    ``col("name")`` reference without executing the expression.
+
+    Raises :class:`schemashift.errors.DSLSyntaxError` on parse failure.
+    """
+    tree = parse(expr)
+    visitor = _ColRefVisitor()
+    visitor.visit(tree)
+    return visitor.cols
 
 
-def _visit(node: ASTNode, refs: set[str]) -> None:  # noqa: C901
-    match node:
-        case ColRef(name=name):
-            refs.add(name)
-        case Literal():
-            return
-        case BinaryOp(left=left, right=right):
-            _visit(left, refs)
-            _visit(right, refs)
-        case UnaryOp(operand=operand):
-            _visit(operand, refs)
-        case MethodCall(obj=obj, args=args):
-            _visit(obj, refs)
-            for arg in args:
-                _visit(arg, refs)
-        case WhenClause(condition=condition, value=value):
-            _visit(condition, refs)
-            _visit(value, refs)
-        case WhenChain(whens=whens, otherwise=otherwise):
-            for when in whens:
-                _visit(when, refs)
-            _visit(otherwise, refs)
-        case Coalesce(exprs=exprs):
-            for expr in exprs:
-                _visit(expr, refs)
-        case Lookup(expr=expr):
-            _visit(expr, refs)
-        case CustomLookup(expr=expr):
-            _visit(expr, refs)
+class _ColRefVisitor(lark.Visitor):
+    def __init__(self) -> None:
+        self.cols: set[str] = set()
+
+    def col_ref(self, tree: lark.Tree) -> None:
+        name = stdlib_ast.literal_eval(str(tree.children[0]))
+        self.cols.add(name)
