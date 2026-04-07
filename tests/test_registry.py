@@ -3,6 +3,9 @@
 import json
 from pathlib import Path
 
+import pytest
+
+from schemashift.errors import ConfigValidationError
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.registry import DictRegistry, FileSystemRegistry
 
@@ -204,14 +207,15 @@ class TestFileSystemRegistryLoadSchema:
         assert schema is not None
         assert schema.name == "my_schema"
 
-    def test_returns_none_when_multiple_schemas_and_no_name(self, tmp_path: Path) -> None:
+    def test_raises_when_multiple_schemas_and_no_name(self, tmp_path: Path) -> None:
         schemas_dir = tmp_path / "schemas"
         schemas_dir.mkdir()
         (schemas_dir / "schema_a.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
         (schemas_dir / "schema_b.yaml").write_text(_OTHER_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        assert reg.load_schema() is None
+        with pytest.raises(ValueError, match="Multiple schemas found"):
+            reg.load_schema()
 
     def test_loads_named_schema_yaml(self, tmp_path: Path) -> None:
         schemas_dir = tmp_path / "schemas"
@@ -247,3 +251,23 @@ class TestFileSystemRegistryLoadSchema:
     def test_returns_none_when_named_schema_and_no_schemas_dir(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
         assert reg.load_schema("any_name") is None
+
+    def test_path_traversal_rejected(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        with pytest.raises(ConfigValidationError):
+            reg.get("../evil")
+
+    def test_dotfile_name_rejected(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        with pytest.raises(ConfigValidationError):
+            reg.get(".hidden")
+
+    def test_hyphenated_name_accepted(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        assert reg.get("my-config") is None
+
+    def test_list_configs_corrupt_file_raises_with_path(self, tmp_path: Path) -> None:
+        reg = FileSystemRegistry(tmp_path)
+        (tmp_path / "bad.json").write_text("{invalid json", encoding="utf-8")
+        with pytest.raises(ConfigValidationError, match="bad.json"):
+            reg.list_configs()

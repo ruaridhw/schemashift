@@ -209,7 +209,7 @@ def tokenize(expression: str) -> list[Token]:
 # ---------------------------------------------------------------------------
 
 _KEYWORDS: frozenset[str] = frozenset(
-    {"col", "when", "otherwise", "true", "false", "null", "coalesce", "lookup", "custom_lookup"}
+    {"col", "when", "otherwise", "true", "false", "null", "coalesce", "lookup", "custom_lookup", "not"}
 )
 
 
@@ -307,12 +307,16 @@ class _Parser:
             left = BinaryOp(op, left, right)
         return left
 
-    # unary := '-' unary | atom_with_methods
+    # unary := '-' unary | 'not' unary | atom_with_methods
     def _unary(self) -> ASTNode:
         if self._match(TT.MINUS):
             self._advance()
             operand = self._unary()
             return UnaryOp("-", operand)
+        if self._match(TT.IDENT) and str(self._peek().value) == "not":
+            self._advance()
+            operand = self._unary()
+            return UnaryOp("!", operand)
         return self._atom_with_methods()
 
     # atom_with_methods := atom ('.' method_chain)*
@@ -391,6 +395,12 @@ class _Parser:
                 return self._lookup_expr()
             if ident == "custom_lookup":
                 return self._custom_lookup_expr()
+            if ident == "not":
+                raise DSLSyntaxError(
+                    "'not' must prefix an expression (e.g. not col(\"x\").is_null())",
+                    expression=self._expr,
+                    position=tok.pos,
+                )
             # Unknown identifier
             raise DSLSyntaxError(
                 f"Unknown identifier {ident!r}",

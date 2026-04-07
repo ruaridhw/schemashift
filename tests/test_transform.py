@@ -5,10 +5,11 @@ from pathlib import Path
 import polars as pl
 import pytest
 
-from schemashift.errors import AmbiguousFormatError, FormatDetectionError
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.errors import AmbiguousFormatError, DSLSyntaxError, FormatDetectionError
+from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.orchestration import auto_transform
 from schemashift.registry import DictRegistry
-from schemashift.transform import auto_transform, dry_run, transform, validate_config
+from schemashift.transform import dry_run, transform, validate_config
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -100,6 +101,14 @@ class TestTransformExprMapping:
         df = transform(NUMBERS_CSV, config).collect()
         assert df["sum_col"].to_list() == pytest.approx([12.0, 24.0, 36.0])
 
+    def test_invalid_dsl_syntax_propagates_as_syntax_error(self) -> None:
+        config = FormatConfig(
+            name="bad_expr",
+            columns=[ColumnMapping(target="sum_col", expr='col("x"')],
+        )
+        with pytest.raises(DSLSyntaxError):
+            transform(NUMBERS_CSV, config).collect()
+
 
 # ---------------------------------------------------------------------------
 # Constant mapping
@@ -130,6 +139,16 @@ class TestTransformConstantMapping:
         )
         df = transform(SAMPLE_CSV, config).collect()
         assert df["version"].to_list() == [42] * 5
+
+    def test_constant_none_broadcasts_nulls(self, tmp_path: Path) -> None:
+        csv = tmp_path / "data.csv"
+        csv.write_text("a\n1\n2\n")
+        config = FormatConfig(
+            name="test",
+            columns=[ColumnMapping(target="flag", constant=None)],
+        )
+        result = transform(str(csv), config).collect()
+        assert result["flag"].is_null().all()
 
 
 # ---------------------------------------------------------------------------
@@ -322,3 +341,17 @@ class TestAutoTransform:
 
         with pytest.raises(AmbiguousFormatError):
             auto_transform(SAMPLE_CSV, reg)
+
+    def test_auto_transform_forwards_reader_config(self, tmp_path: Path) -> None:
+        csv = tmp_path / "data.csv"
+        csv.write_text("metadata\na,b\n1,2\n")
+        config = FormatConfig(
+            name="test",
+            reader=ReaderConfig(skip_rows=1),
+            columns=[ColumnMapping(target="a", source="a"), ColumnMapping(target="b", source="b")],
+        )
+        reg = DictRegistry()
+        reg.register(config)
+        result = auto_transform(str(csv), reg, reader_config=ReaderConfig(skip_rows=1)).collect()
+        assert list(result.columns) == ["a", "b"]
+        assert result.shape == (1, 2)

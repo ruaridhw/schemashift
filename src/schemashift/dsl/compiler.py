@@ -299,8 +299,17 @@ def _compile_method(obj: ASTNode, method: str, args: tuple[ASTNode, ...]) -> pl.
             return base.dt.strftime(fmt)
 
         case "dt.timestamp":
-            _expect_arity(method, args, 0)
-            return base.dt.timestamp("ms")
+            if len(args) == 0:
+                return base.dt.timestamp("ms")
+            _expect_arity(method, args, 1)
+            unit = _literal_str(args[0], method)
+            if unit not in ("ms", "us", "ns"):
+                raise DSLSyntaxError(
+                    f"dt.timestamp() unit must be 'ms', 'us', or 'ns', got {unit!r}",
+                    expression="",
+                    position=-1,
+                )
+            return base.dt.timestamp(unit)
 
         case _:
             raise DSLRuntimeError(f"Unsupported method: {method!r}")

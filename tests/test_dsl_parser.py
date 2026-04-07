@@ -200,6 +200,14 @@ class TestUnary:
     def test_double_negation(self) -> None:
         assert parse_dsl("-(-1)") == UnaryOp("-", UnaryOp("-", Literal(1)))
 
+    def test_not_is_null(self) -> None:
+        node = parse_dsl('not col("X").is_null()')
+        assert node == UnaryOp("!", MethodCall(ColRef("X"), "is_null", ()))
+
+    def test_double_not(self) -> None:
+        node = parse_dsl('not not col("x").is_null()')
+        assert node == UnaryOp("!", UnaryOp("!", MethodCall(ColRef("x"), "is_null", ())))
+
 
 # ---------------------------------------------------------------------------
 # Parenthesised expressions

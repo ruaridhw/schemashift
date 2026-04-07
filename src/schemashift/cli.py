@@ -15,12 +15,14 @@ from schemashift.errors import (
     AmbiguousFormatError,
     ConfigValidationError,
     FormatDetectionError,
+    ReviewRejectedError,
 )
 from schemashift.models import FormatConfig
+from schemashift.orchestration import auto_transform
 from schemashift.registry import FileSystemRegistry
-from schemashift.transform import auto_transform, validate_config
 from schemashift.transform import dry_run as _dry_run
 from schemashift.transform import transform as _transform
+from schemashift.transform import validate_config
 
 _CONFIG_PATH_TYPE = click.Path(exists=True, file_okay=True, readable=True, path_type=Path)
 
@@ -47,15 +49,13 @@ def transform(file: str, config: Path | None, registry: str | None, output: str 
         else:
             raise click.UsageError("Provide either --config or --registry.")
 
-        df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
-
         if output is not None:
-            _write_output(df, output)
-            click.echo(f"Written {len(df)} rows to '{output}'.")
+            _sink_output(lf, output)
+            click.echo(f"Written to '{output}'.")
         else:
-            click.echo(str(df.head(20)))
+            click.echo(str(lf.head(20).collect()))
 
-    except (FormatDetectionError, AmbiguousFormatError, ConfigValidationError) as exc:
+    except (FormatDetectionError, AmbiguousFormatError, ConfigValidationError, ReviewRejectedError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
     except Exception as exc:
@@ -69,7 +69,7 @@ def validate(config_path: Path) -> None:
     """Validate a format config file."""
     try:
         fmt_config = _load_format_config(config_path)
-    except (ConfigValidationError, Exception) as exc:
+    except Exception as exc:
         click.echo(f"Config load error: {exc}", err=True)
         sys.exit(1)
 
@@ -134,8 +134,8 @@ def generate(  # noqa: PLR0913
 ) -> None:
     """Generate a FormatConfig for an unknown file using an LLM.
 
-    Requires ANTHROPIC_API_KEY or OPENAI_API_KEY in environment,
-    or configure your LLM via environment variables.
+    Requires ANTHROPIC_API_KEY (direct) or FOUNDRY_API_KEY + FOUNDRY_RESOURCE
+    (Azure AI Foundry) to be set in the environment.
     """
     try:
         from schemashift.llm import generate_config
@@ -228,8 +228,7 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
 
     Resolution order:
     1. If *target_schema_path* is given, load it directly.
-    2. If *registry_path* is given, glob for ``*.yaml``/``*.yml`` in
-       ``{registry_path}/schemas/``.  Exactly one match is required.
+    2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_schema`.
     3. Otherwise raise :class:`click.UsageError`.
     """
     from schemashift.target_schema import TargetSchema
@@ -238,16 +237,12 @@ def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -
         return TargetSchema.from_yaml(target_schema_path)
 
     if registry_path is not None:
-        schemas_dir = Path(registry_path) / "schemas"
-        if schemas_dir.exists():
-            yamls = list(schemas_dir.glob("*.yaml")) + list(schemas_dir.glob("*.yml"))
-            if len(yamls) == 1:
-                return TargetSchema.from_yaml(yamls[0])
-            elif len(yamls) > 1:
-                names = [y.name for y in yamls]
-                raise click.UsageError(
-                    f"Multiple schemas found in '{schemas_dir}': {names}. Use --target-schema to specify one."
-                )
+        try:
+            schema = FileSystemRegistry(registry_path).load_schema()
+        except ValueError as exc:
+            raise click.UsageError(str(exc)) from exc
+        if schema is not None:
+            return schema
 
     raise click.UsageError("Provide --target-schema or --registry with a schemas/ subdirectory.")
 
@@ -267,15 +262,15 @@ def _load_format_config(path: Path) -> FormatConfig:
     return FormatConfig.model_validate(data)
 
 
-def _write_output(df: pl.DataFrame, output: str) -> None:
-    """Write a DataFrame to the given path based on its file extension."""
+def _sink_output(lf: pl.LazyFrame, output: str) -> None:
+    """Stream a LazyFrame to a file using Polars sink methods where available."""
     out_path = Path(output)
     ext = out_path.suffix.lower()
     if ext == ".csv":
-        df.write_csv(output)
+        lf.sink_csv(out_path)
     elif ext == ".parquet":
-        df.write_parquet(output)
+        lf.sink_parquet(out_path)
     elif ext == ".json":
-        df.write_json(output)
+        lf.collect().write_json(out_path)
     else:
         raise click.UsageError(f"Unsupported output format '{ext}'. Use .csv, .parquet, or .json.")
