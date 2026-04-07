@@ -490,21 +490,15 @@ class TestSyntaxErrors:
             parse_dsl('col("X") +')
 
     def test_error_contains_position(self) -> None:
-        try:
+        with pytest.raises(DSLSyntaxError) as exc_info:
             parse_dsl('col("X").badmethod()')
-        except DSLSyntaxError as exc:
-            assert exc.position >= 0
-        else:
-            pytest.fail("Expected DSLSyntaxError")
+        assert exc_info.value.position >= 0
 
     def test_error_contains_expression(self) -> None:
         expr = 'col("X").badmethod()'
-        try:
+        with pytest.raises(DSLSyntaxError) as exc_info:
             parse_dsl(expr)
-        except DSLSyntaxError as exc:
-            assert exc.expression == expr
-        else:
-            pytest.fail("Expected DSLSyntaxError")
+        assert exc_info.value.expression == expr
 
     def test_invalid_character(self) -> None:
         with pytest.raises(DSLSyntaxError):

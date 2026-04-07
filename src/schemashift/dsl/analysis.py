@@ -22,7 +22,7 @@ def collect_col_refs(node: ASTNode) -> set[str]:
     return refs
 
 
-def _visit(node: ASTNode, refs: set[str]) -> None:
+def _visit(node: ASTNode, refs: set[str]) -> None:  # noqa: C901
     match node:
         case ColRef(name=name):
             refs.add(name)

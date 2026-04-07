@@ -7,7 +7,7 @@ When a file arrives from a source you have no config for, `smart_transform()` ca
 1. schemashift reads the file headers and a small sample (default 5 rows)
 2. Sends them to your LLM along with the target schema and the DSL reference
 3. The LLM returns a `FormatConfig` as JSON
-4. schemashift validates the config: parses all DSL expressions, runs a dry-run against the sample
+4. schemashift validates the config: parses all DSL expressions, transforms the sample rows
 5. On failure, retries up to N times (default 2) with the error appended to the prompt
 6. On success, optionally saves the config to the registry
 
@@ -66,7 +66,6 @@ result = ss.smart_transform(
     llm=llm,
     auto_register=True,  # saves the config so next run hits the registry
 )
-df = result.collect()
 ```
 
 If the file matches an existing config in the registry, `smart_transform()` uses it directly — the LLM is only called on a miss.

@@ -17,6 +17,7 @@ from click.testing import CliRunner
 from schemashift.cli import cli
 from schemashift.llm import generate_config, load_default_llm
 from schemashift.target_schema import TargetSchema
+from schemashift.transform import transform
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -52,9 +53,7 @@ class TestGenerateConfigIntegration:
         assert len(config.columns) > 0
 
         # Config should actually transform the file without error
-        from schemashift.transform import dry_run
-
-        df = dry_run(config, camstar_csv, n_rows=3)
+        df = transform(camstar_csv, config, n_rows=3)
         assert len(df) == 3
 
     def test_prompt_influences_output(self, camstar_csv, lot_movement_schema, llm):
@@ -72,9 +71,7 @@ class TestGenerateConfigIntegration:
         assert config.name
         assert len(config.columns) > 0
 
-        from schemashift.transform import dry_run
-
-        df = dry_run(config, camstar_csv, n_rows=3)
+        df = transform(camstar_csv, config, n_rows=3)
         assert len(df) == 3
 
 

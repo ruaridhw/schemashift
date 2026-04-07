@@ -110,7 +110,7 @@ class TestSourceOnlyConfigProducesTargetColumns:
         columns = [ColumnMapping(target=t, source=f"src_{t}") for t in targets]
         config = FormatConfig(name="test", columns=columns)
 
-        result = transform(path, config).collect()
+        result = transform(path, config)
         assert set(result.columns) == set(targets)
 
     @given(
@@ -134,7 +134,7 @@ class TestSourceOnlyConfigProducesTargetColumns:
         columns = [ColumnMapping(target=t, source=f"src_{t}") for t in targets]
         config = FormatConfig(name="test", columns=columns)
 
-        result = transform(path, config).collect()
+        result = transform(path, config)
         assert len(result) == n_rows
 
 
@@ -224,7 +224,7 @@ class TestConstantMappingRowCounts:
                 ColumnMapping(target="out", constant=str(const_value)),
             ],
         )
-        result = transform(path, config).collect()
+        result = transform(path, config)
         assert len(result) == n_rows
         assert "out" in result.columns
 
@@ -244,7 +244,7 @@ class TestConstantMappingRowCounts:
             ColumnMapping(target=f"col_{i}", constant="fixed") for i in range(n_cols)
         ]
         config = FormatConfig(name="t", columns=columns)
-        result = transform(path, config).collect()
+        result = transform(path, config)
 
         assert len(result) == n_rows
         for i in range(n_cols):

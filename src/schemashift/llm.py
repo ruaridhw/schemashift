@@ -1,6 +1,7 @@
 """LLM-assisted config generation for schemashift."""
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -12,7 +13,7 @@ from .errors import LLMGenerationError
 from .models import FormatConfig, ReaderConfig
 from .readers import read_file
 from .target_schema import TargetSchema
-from .transform import dry_run, validate_config
+from .transform import transform, validate_config
 
 _log = logging.getLogger(__name__)
 
@@ -39,14 +40,14 @@ class LangChainLLMBackend:
 
     def generate(self, prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
         try:
-            from langchain.agents import create_agent
-            from langchain_core.messages import HumanMessage
-            from langchain_core.tools import tool
+            from langchain.agents import create_agent  # noqa: PLC0415
+            from langchain_core.messages import HumanMessage  # noqa: PLC0415
+            from langchain_core.tools import tool  # noqa: PLC0415
         except ImportError as exc:
             raise ImportError("langchain is not installed. Run: pip install 'schemashift[llm]'") from exc
 
         inferred_name = str(schema["format_name"])
-        path = str(schema["path"])
+        path = Path(schema["path"])
         result_box: list[dict[str, Any]] = []
 
         @tool
@@ -86,7 +87,7 @@ class LangChainLLMBackend:
                 return f"DSL errors:\n{error}"
 
             try:
-                dry_run(config, path, n_rows=5)
+                transform(path, config, n_rows=5)
             except Exception as exc:
                 error = str(exc)
                 self.attempts.append({"response": data, "error": error})
@@ -126,17 +127,15 @@ def load_default_llm() -> Any:
         ImportError: When ``langchain-anthropic`` is not installed.
         ValueError: When no recognised API key is found in the environment.
     """
-    import os
-
     try:
-        from dotenv import load_dotenv
+        from dotenv import load_dotenv  # noqa: PLC0415
 
         load_dotenv()
     except ImportError:
         pass  # python-dotenv optional; env vars may already be set
 
     try:
-        from langchain_anthropic import ChatAnthropic
+        from langchain_anthropic import ChatAnthropic  # noqa: PLC0415
     except ImportError as exc:
         raise ImportError("langchain-anthropic is not installed. Run: pip install 'schemashift[llm]'") from exc
 
@@ -144,16 +143,16 @@ def load_default_llm() -> Any:
     foundry_resource = os.getenv("FOUNDRY_RESOURCE")
     if foundry_key and foundry_resource:
         model_name = os.getenv("MODEL_NAME", "claude-haiku-4-5")
-        return ChatAnthropic(
-            model=model_name,
-            api_key=foundry_key,
-            base_url=f"https://{foundry_resource}.services.ai.azure.com/anthropic",
-        )  # ty: ignore[missing-argument, unknown-argument]
+        return ChatAnthropic(  # ty: ignore[missing-argument]
+            model=model_name,  # ty: ignore[unknown-argument]
+            api_key=foundry_key,  # ty: ignore[unknown-argument]
+            base_url=f"https://{foundry_resource}.services.ai.azure.com/anthropic",  # ty: ignore[unknown-argument]
+        )
 
     if os.getenv("ANTHROPIC_API_KEY"):
-        return ChatAnthropic(
-            model="claude-haiku-4-5-20251001", temperature=0
-        )  # ty: ignore[missing-argument, unknown-argument]
+        return ChatAnthropic(  # ty: ignore[missing-argument]
+            model="claude-haiku-4-5-20251001", temperature=0  # ty: ignore[unknown-argument]
+        )
 
     raise ValueError(
         "No LLM API key found. Set FOUNDRY_API_KEY + FOUNDRY_RESOURCE (Azure AI Foundry) or ANTHROPIC_API_KEY."
@@ -207,8 +206,7 @@ def build_prompt(
     separator_row = "| " + " | ".join("---" for _ in headers) + " |"
     parts.append(header_row)
     parts.append(separator_row)
-    for row in sample_df.rows():
-        parts.append("| " + " | ".join(str(v) for v in row) + " |")
+    parts.extend("| " + " | ".join(str(v) for v in row) + " |" for row in sample_df.rows())
 
     # Source columns with dtypes
     parts.append("\n## Source File Columns")
@@ -222,8 +220,7 @@ def build_prompt(
             f"The following are example configs that map to the same "
             f"'{target_schema.name}' target schema:"
         )
-        for ex in example_configs:
-            parts.append(ex.model_dump_json(indent=2))
+        parts.extend(ex.model_dump_json(indent=2) for ex in example_configs)
 
     # Additional user-provided context
     if user_prompt:
@@ -233,7 +230,7 @@ def build_prompt(
 
 
 def generate_config(
-    path: str,
+    path: Path,
     target_schema: TargetSchema,
     llm: "LLMBackend | Any",
     example_configs: list[FormatConfig] | None = None,

@@ -26,10 +26,8 @@ dsl
 
 ### Transform functions
 - {py:func}`schemashift.transform`
-- {py:func}`schemashift.auto_transform`
 - {py:func}`schemashift.smart_transform`
 - {py:func}`schemashift.validate_config`
-- {py:func}`schemashift.dry_run`
 - {py:func}`schemashift.detect_format`
 - {py:func}`schemashift.read_file`
 

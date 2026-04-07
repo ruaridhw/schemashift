@@ -455,8 +455,6 @@ class TestDatetimeMethodsExtended:
         assert all(t > 0 for t in ts_list)  # type: ignore[operator]
 
     def test_dt_timestamp_invalid_unit_raises(self, datetime_df: pl.DataFrame) -> None:
-        from schemashift.errors import DSLSyntaxError
-
         with pytest.raises(DSLSyntaxError, match="unit"):
             datetime_df.select(parse_and_compile('col("ts").dt.timestamp("s")').alias("out"))
 
