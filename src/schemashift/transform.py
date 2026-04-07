@@ -146,6 +146,7 @@ def smart_transform(
     example_configs: list[FormatConfig] | None = None,
     max_retries: int = 2,
     n_sample_rows: int = 15,
+    user_prompt: str | None = None,
 ) -> pl.LazyFrame:
     """Full detect-or-generate flow.
 
@@ -165,6 +166,7 @@ def smart_transform(
         example_configs: Example configs for LLM prompt.
         max_retries: Max LLM retries.
         n_sample_rows: Rows to sample for LLM.
+        user_prompt: Additional context for the LLM (e.g. unit conventions).
 
     Returns:
         Transformed pl.LazyFrame.
@@ -204,6 +206,7 @@ def smart_transform(
         example_configs=example_configs,
         max_retries=max_retries,
         n_sample_rows=n_sample_rows,
+        user_prompt=user_prompt,
     )
 
     # Review callback

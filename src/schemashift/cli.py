@@ -116,6 +116,12 @@ def dry_run(config_path: Path, sample: str, rows: int) -> None:
     default=False,
     help="Interactively review generated config before saving.",
 )
+@click.option(
+    "--prompt",
+    "-p",
+    default=None,
+    help="Additional context for the LLM (e.g. column units, timestamp formats).",
+)
 def generate(  # noqa: PLR0913
     file: str,
     target_schema: str | None,
@@ -124,6 +130,7 @@ def generate(  # noqa: PLR0913
     name: str | None,
     rows: int,
     interactive: bool,
+    prompt: str | None,
 ) -> None:
     """Generate a FormatConfig for an unknown file using an LLM.
 
@@ -146,6 +153,7 @@ def generate(  # noqa: PLR0913
             llm=llm,
             format_name=name,
             n_sample_rows=rows,
+            user_prompt=prompt,
         )
 
         if interactive:

@@ -61,7 +61,10 @@ packages = ["src/schemashift"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=schemashift --cov-report=term-missing"
+addopts = "--cov=schemashift --cov-report=term-missing -m 'not llm'"
+markers = [
+    "llm: tests that call a real LLM API (require ANTHROPIC_API_KEY)",
+]
 
 [tool.ruff]
 src = ["src"]
