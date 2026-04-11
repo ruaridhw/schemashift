@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.12,<3",
     "click>=8.3,<9",
     "fastexcel>=0.19,<1",
+    "lark>=1.2,<2",
 ]
 
 [project.optional-dependencies]
@@ -106,7 +107,7 @@ ignore_names = [
     "cls",
     "schema_version",
 ]
-exclude = [".venv/"]
+exclude = [".venv/", "src/schemashift/dsl/compiler.py", "src/schemashift/dsl/analysis.py", "src/schemashift/dsl/_lookups.py"]
 min_confidence = 60
 paths = ["src/", "whitelist_vulture.py"]
 

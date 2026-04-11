@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
-from .dsl import collect_col_refs, parse_dsl
+from .dsl import collect_col_refs
 from .dtypes import DTYPE_MAP, DType
 from .errors import ConfigValidationError
 
@@ -150,5 +150,5 @@ class FormatConfig(BaseModel):
             if mapping.source is not None:
                 cols.add(mapping.source)
             if mapping.expr is not None:
-                cols.update(collect_col_refs(parse_dsl(mapping.expr)))
+                cols.update(collect_col_refs(mapping.expr))
         return cols

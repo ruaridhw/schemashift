@@ -10,7 +10,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from schemashift.dsl import parse_and_compile
-from schemashift.dsl.parser import parse_dsl
 from schemashift.errors import DSLSyntaxError
 from schemashift.models import ColumnMapping, FormatConfig
 from schemashift.target_schema import TargetSchema
@@ -188,7 +187,7 @@ class TestDslParserNeverCrashes:
     def test_dsl_parser_raises_dsl_syntax_error_or_returns_ast(self, text: str) -> None:
         """Parser must either return an ASTNode or raise DSLSyntaxError — never crash."""
         try:
-            parse_dsl(text)
+            parse_and_compile(text)
         except DSLSyntaxError:
             pass  # Expected for invalid input
         except Exception as exc:
