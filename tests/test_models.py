@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from schemashift.errors import ConfigValidationError
-from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.models import ColumnMapping, ReaderConfig, TransformSpec
 
 
 class TestColumnMappingValidation:
@@ -63,12 +63,12 @@ class TestColumnMappingValidation:
         assert col.constant is None
 
     def test_constant_none_round_trips_json(self) -> None:
-        config = FormatConfig(
+        config = TransformSpec(
             name="test",
             columns=[ColumnMapping(target="flag", constant=None)],
         )
         dumped = json.loads(config.model_dump_json())
-        reloaded = FormatConfig.model_validate(dumped)
+        reloaded = TransformSpec.model_validate(dumped)
         assert reloaded.columns[0].constant is None
         assert reloaded.columns[0].has_constant()
 
@@ -136,14 +136,14 @@ class TestReaderConfig:
         assert cfg.sheet_name == 1
 
 
-class TestFormatConfigValidation:
+class TestTransformSpecValidation:
     def _make_config(self, columns=None, **kwargs):
         if columns is None:
             columns = [
                 ColumnMapping(target="a", source="col_a"),
                 ColumnMapping(target="b", expr='col("col_b") * 2'),
             ]
-        return FormatConfig(name="test", columns=columns, **kwargs)
+        return TransformSpec(name="test", columns=columns, **kwargs)
 
     def test_valid_config_created(self):
         cfg = self._make_config()
@@ -161,31 +161,31 @@ class TestFormatConfigValidation:
             ColumnMapping(target="dup", source="b"),
         ]
         with pytest.raises(ConfigValidationError, match="duplicate target"):
-            FormatConfig(name="bad", columns=cols)
+            TransformSpec(name="bad", columns=cols)
 
     def test_unique_targets_pass(self):
         cols = [
             ColumnMapping(target="x", source="a"),
             ColumnMapping(target="y", source="b"),
         ]
-        cfg = FormatConfig(name="ok", columns=cols)
+        cfg = TransformSpec(name="ok", columns=cols)
         assert len(cfg.columns) == 2
 
 
-class TestFormatConfigSourceColumns:
+class TestTransformSpecSourceColumns:
     def test_source_fields_extracted(self):
         cols = [
             ColumnMapping(target="out_a", source="raw_a"),
             ColumnMapping(target="out_b", source="raw_b"),
         ]
-        cfg = FormatConfig(name="f", columns=cols)
+        cfg = TransformSpec(name="f", columns=cols)
         assert cfg.source_columns() == {"raw_a", "raw_b"}
 
     def test_col_references_in_expr_extracted(self):
         cols = [
             ColumnMapping(target="total", expr='col("price") * col("qty")'),
         ]
-        cfg = FormatConfig(name="f", columns=cols)
+        cfg = TransformSpec(name="f", columns=cols)
         assert cfg.source_columns() == {"price", "qty"}
 
     def test_mix_of_source_and_expr(self):
@@ -194,32 +194,32 @@ class TestFormatConfigSourceColumns:
             ColumnMapping(target="tax", expr='col("amount") * 0.2'),
             ColumnMapping(target="flag", constant=True),
         ]
-        cfg = FormatConfig(name="f", columns=cols)
+        cfg = TransformSpec(name="f", columns=cols)
         assert cfg.source_columns() == {"full_name", "amount"}
 
     def test_constant_columns_not_included(self):
         cols = [ColumnMapping(target="status", constant="active")]
-        cfg = FormatConfig(name="f", columns=cols)
+        cfg = TransformSpec(name="f", columns=cols)
         assert cfg.source_columns() == set()
 
     def test_single_quoted_col_refs_extracted(self):
-        cfg = FormatConfig(
+        cfg = TransformSpec(
             name="f",
             columns=[ColumnMapping(target="out", expr="col('price') * col('qty')")],
         )
         assert cfg.source_columns() == {"price", "qty"}
 
     def test_nested_expr_col_refs_extracted(self):
-        cfg = FormatConfig(
+        cfg = TransformSpec(
             name="f",
             columns=[ColumnMapping(target="out", expr='coalesce(col("a"), col("b"))')],
         )
         assert cfg.source_columns() == {"a", "b"}
 
 
-class TestFormatConfigJsonRoundTrip:
+class TestTransformSpecJsonRoundTrip:
     def test_round_trip_via_model_dump_and_validate(self):
-        original = FormatConfig(
+        original = TransformSpec(
             name="invoice",
             description="Invoice format",
             version=2,
@@ -232,7 +232,7 @@ class TestFormatConfigJsonRoundTrip:
             drop_unmapped=False,
         )
         data = original.model_dump()
-        restored = FormatConfig.model_validate(data)
+        restored = TransformSpec.model_validate(data)
 
         assert restored.name == original.name
         assert restored.description == original.description
@@ -250,38 +250,20 @@ class TestFormatConfigJsonRoundTrip:
 
 
 # ---------------------------------------------------------------------------
-# FormatConfig.target_schema
+# TransformSpec.output_schema
 # ---------------------------------------------------------------------------
 
 
-class TestFormatConfigTargetSchema:
+class TestTransformSpecOutputSchema:
     def _minimal_columns(self) -> list[dict]:
         return [{"target": "out", "source": "in"}]
 
-    def test_target_schema_accepted(self) -> None:
-        cfg = FormatConfig(
-            name="test",
-            target_schema="lot_movement",
-            columns=self._minimal_columns(),
-        )
-        assert cfg.target_schema == "lot_movement"
+    def test_output_schema_defaults_to_none(self) -> None:
+        cfg = TransformSpec(name="test", columns=self._minimal_columns())
+        assert cfg.output_schema is None
 
-    def test_target_schema_defaults_to_none(self) -> None:
-        cfg = FormatConfig(name="test", columns=self._minimal_columns())
-        assert cfg.target_schema is None
-
-    def test_target_schema_round_trips_json(self) -> None:
-        original = FormatConfig(
-            name="test",
-            target_schema="lot_movement",
-            columns=self._minimal_columns(),
-        )
+    def test_output_schema_none_round_trips_json(self) -> None:
+        original = TransformSpec(name="test", columns=self._minimal_columns())
         data = original.model_dump()
-        restored = FormatConfig.model_validate(data)
-        assert restored.target_schema == "lot_movement"
-
-    def test_target_schema_none_round_trips_json(self) -> None:
-        original = FormatConfig(name="test", columns=self._minimal_columns())
-        data = original.model_dump()
-        restored = FormatConfig.model_validate(data)
-        assert restored.target_schema is None
+        restored = TransformSpec.model_validate(data)
+        assert restored.output_schema is None

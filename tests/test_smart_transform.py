@@ -5,10 +5,10 @@ import pytest
 from conftest import make_tool_calling_llm
 
 from schemashift.errors import FormatDetectionError, ReviewRejectedError
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.orchestration import smart_transform
 from schemashift.registry import DictRegistry
-from schemashift.target_schema import TargetColumn, TargetSchema
+from schemashift.validation import ColumnConstraints, SchemaConfig
 
 
 @pytest.fixture
@@ -26,19 +26,19 @@ def sample_csv(tmp_path):
 
 @pytest.fixture
 def schema():
-    return TargetSchema(
+    return SchemaConfig(
         name="students",
-        columns=[
-            TargetColumn(name="student_name", type="str", required=True, description="Name"),
-            TargetColumn(name="score", type="float64", required=True, description="Score"),
-            TargetColumn(name="grade", type="str", required=True, description="Grade"),
-        ],
+        columns={
+            "student_name": ColumnConstraints(type="str", nullable=False, description="Name"),
+            "score": ColumnConstraints(type="float64", nullable=False, description="Score"),
+            "grade": ColumnConstraints(type="str", nullable=False, description="Grade"),
+        },
     )
 
 
 @pytest.fixture
 def matching_config():
-    return FormatConfig(
+    return TransformSpec(
         name="student_format",
         columns=[
             ColumnMapping(target="student_name", source="Name"),
@@ -63,22 +63,24 @@ class TestRegistryHit:
     def test_uses_registry_when_match(self, sample_csv, schema, matching_config):
         reg = DictRegistry()
         reg.register(matching_config)
-        df = smart_transform(sample_csv, registry=reg, target_schema=schema)
-        assert set(df.columns) == {"student_name", "score", "grade"}
-        assert len(df) == 2
+        result = smart_transform(sample_csv, registry=reg, target_schema=schema)
+        assert set(result.valid.columns) == {"student_name", "score", "grade"}
+        assert len(result.valid) == 2
 
     def test_works_without_target_schema(self, sample_csv, matching_config):
         reg = DictRegistry()
         reg.register(matching_config)
-        df = smart_transform(sample_csv, registry=reg)
-        assert "student_name" in df.columns
+        result = smart_transform(sample_csv, registry=reg)
+        assert "student_name" in result.valid.columns
 
 
 class TestLLMGeneration:
     def test_generates_when_no_match(self, sample_csv, schema):
         reg = DictRegistry()
-        df = smart_transform(sample_csv, registry=reg, target_schema=schema, llm=make_tool_calling_llm(_valid_config()))
-        assert set(df.columns) == {"student_name", "score", "grade"}
+        result = smart_transform(
+            sample_csv, registry=reg, target_schema=schema, llm=make_tool_calling_llm(_valid_config())
+        )
+        assert set(result.valid.columns) == {"student_name", "score", "grade"}
 
     def test_auto_registers(self, sample_csv, schema):
         reg = DictRegistry()
@@ -105,9 +107,9 @@ class TestReviewFn:
         reg = DictRegistry()
 
         def review(cfg, df_sample):
-            return FormatConfig(name="reviewed", columns=cfg.columns)
+            return TransformSpec(name="reviewed", columns=cfg.columns)
 
-        df = smart_transform(
+        result = smart_transform(
             sample_csv,
             registry=reg,
             target_schema=schema,
@@ -116,7 +118,7 @@ class TestReviewFn:
             auto_register=True,
         )
         assert reg.get("reviewed") is not None
-        assert len(df) == 2
+        assert len(result.valid) == 2
 
     def test_review_fn_rejection(self, sample_csv, schema):
         with pytest.raises(ReviewRejectedError, match="rejected"):

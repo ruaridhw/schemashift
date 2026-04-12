@@ -10,10 +10,10 @@ from pydantic import ValidationError
 
 from . import dsl as _dsl_module
 from .errors import LLMGenerationError
-from .models import FormatConfig, ReaderConfig
+from .models import ReaderConfig, TransformSpec
 from .readers import read_file
-from .target_schema import TargetSchema
 from .transform import transform, validate_config
+from .validation import SchemaConfig
 
 _log = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class LLMBackend(Protocol):
     attempts: list[dict[str, Any]]
 
     def generate(self, prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
-        """Generate a candidate FormatConfig payload."""
+        """Generate a candidate TransformSpec payload."""
 
 
 class LangChainLLMBackend:
@@ -57,7 +57,7 @@ class LangChainLLMBackend:
             description: str = "",
             drop_unmapped: bool = True,
         ) -> str:
-            """Submit the generated FormatConfig mapping source columns to the target schema.
+            """Submit the generated TransformSpec mapping source columns to the target schema.
 
             Each column dict must contain 'target' and exactly one of: 'source' (direct
             column rename), 'expr' (DSL expression string), or 'constant' (literal value).
@@ -72,18 +72,18 @@ class LangChainLLMBackend:
             }
 
             try:
-                config = FormatConfig.model_validate(data)
+                config = TransformSpec.model_validate(data)
             except (ValidationError, Exception) as exc:
                 error = str(exc)
                 self.attempts.append({"response": data, "error": error})
-                _log.warning("FormatConfig validation attempt failed: %s", error)
+                _log.warning("TransformSpec validation attempt failed: %s", error)
                 return f"Validation error: {error}"
 
             dsl_errors = validate_config(config)
             if dsl_errors:
                 error = "\n".join(dsl_errors)
                 self.attempts.append({"response": data, "error": error})
-                _log.warning("FormatConfig validation attempt failed: %s", error)
+                _log.warning("TransformSpec validation attempt failed: %s", error)
                 return f"DSL errors:\n{error}"
 
             try:
@@ -91,7 +91,7 @@ class LangChainLLMBackend:
             except Exception as exc:
                 error = str(exc)
                 self.attempts.append({"response": data, "error": error})
-                _log.warning("FormatConfig validation attempt failed: %s", error)
+                _log.warning("TransformSpec validation attempt failed: %s", error)
                 return f"Runtime error during dry run: {error}"
 
             self.attempts.append({"response": data, "error": None})
@@ -161,19 +161,19 @@ def load_default_llm() -> Any:
 
 def build_prompt(
     sample_df: pl.DataFrame,
-    target_schema: TargetSchema,
+    target_schema: SchemaConfig,
     file_columns: list[str],
-    example_configs: list[FormatConfig] | None = None,
+    example_configs: list[TransformSpec] | None = None,
     format_name: str = "unknown_format",
     user_prompt: str | None = None,
 ) -> str:
-    """Build a prompt requesting a FormatConfig for the given file.
+    """Build a prompt requesting a TransformSpec for the given file.
 
     Args:
         sample_df: A small sample of the source data.
         target_schema: The desired output schema.
         file_columns: Column names present in the source file.
-        example_configs: Optional list of existing FormatConfigs to show as examples.
+        example_configs: Optional list of existing TransformSpecs to show as examples.
         format_name: Suggested name for the new format config.
         user_prompt: Optional extra context appended to the prompt (e.g. unit
             conventions, timestamp formats).
@@ -185,16 +185,16 @@ def build_prompt(
 
     parts.append(
         "You are a data engineering assistant. Call the submit_format_config tool with a "
-        f"FormatConfig that maps columns from a source file named '{format_name}' to the "
+        f"TransformSpec that maps columns from a source file named '{format_name}' to the "
         "target schema below."
     )
 
     # Target schema
     parts.append("\n## Target Schema")
-    for col in target_schema.columns:
-        required_label = "required" if col.required else "optional"
-        desc = f" — {col.description}" if col.description else ""
-        parts.append(f"  - {col.name} ({col.type}, {required_label}){desc}")
+    for col_name, constraints in target_schema.columns.items():
+        required_label = "optional" if constraints.nullable else "required"
+        desc = f" — {constraints.description}" if constraints.description else ""
+        parts.append(f"  - {col_name} ({constraints.type}, {required_label}){desc}")
 
     # DSL reference
     parts.append(f"\n## {_DSL_REFERENCE}")
@@ -231,16 +231,16 @@ def build_prompt(
 
 def generate_config(
     path: Path,
-    target_schema: TargetSchema,
+    target_schema: SchemaConfig,
     llm: "LLMBackend | Any",
-    example_configs: list[FormatConfig] | None = None,
+    example_configs: list[TransformSpec] | None = None,
     format_name: str | None = None,
     max_retries: int = 2,
     n_sample_rows: int = 15,
     user_prompt: str | None = None,
     reader_config: ReaderConfig | None = None,
-) -> FormatConfig:
-    """Generate a FormatConfig for the given file using the configured LLM backend.
+) -> TransformSpec:
+    """Generate a TransformSpec for the given file using the configured LLM backend.
 
     Wraps plain LangChain models in :class:`LangChainLLMBackend` automatically.
     Validation errors (Pydantic, DSL, dry-run) are returned as tool result strings
@@ -250,7 +250,7 @@ def generate_config(
         path: Path to the source data file.
         target_schema: The desired output schema.
         llm: An :class:`LLMBackend` or LangChain-compatible model instance.
-        example_configs: Optional existing FormatConfigs to include as examples.
+        example_configs: Optional existing TransformSpecs to include as examples.
         format_name: Name for the generated config. Defaults to the file stem.
         max_retries: Number of additional attempts after the first failure.
         n_sample_rows: Number of rows to sample from the file for the prompt.
@@ -261,7 +261,7 @@ def generate_config(
             skip_rows.
 
     Returns:
-        A validated :class:`~schemashift.models.FormatConfig`.
+        A validated :class:`~schemashift.models.TransformSpec`.
 
     Raises:
         LLMGenerationError: When the backend fails to produce a valid config.
@@ -289,4 +289,4 @@ def generate_config(
             attempts.append({"response": "", "error": str(exc)})
         raise LLMGenerationError(str(exc), attempts=attempts) from exc
 
-    return FormatConfig.model_validate(data)
+    return TransformSpec.model_validate(data)

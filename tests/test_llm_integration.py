@@ -16,8 +16,8 @@ from click.testing import CliRunner
 
 from schemashift.cli import cli
 from schemashift.llm import generate_config, load_default_llm
-from schemashift.target_schema import TargetSchema
 from schemashift.transform import transform
+from schemashift.validation import SchemaConfig
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -31,7 +31,7 @@ def llm():
 
 @pytest.fixture
 def lot_movement_schema():
-    return TargetSchema.from_yaml(FIXTURES / "configs" / "lot_movement_schema.yaml")
+    return SchemaConfig.from_yaml(FIXTURES / "configs" / "lot_movement_schema.yaml")
 
 
 @pytest.fixture
@@ -53,8 +53,8 @@ class TestGenerateConfigIntegration:
         assert len(config.columns) > 0
 
         # Config should actually transform the file without error
-        df = transform(camstar_csv, config, n_rows=3)
-        assert len(df) == 3
+        result = transform(camstar_csv, config, n_rows=3)
+        assert len(result.valid) == 3
 
     def test_prompt_influences_output(self, camstar_csv, lot_movement_schema, llm):
         """The prompt arg should be included as context for the LLM."""
@@ -71,8 +71,8 @@ class TestGenerateConfigIntegration:
         assert config.name
         assert len(config.columns) > 0
 
-        df = transform(camstar_csv, config, n_rows=3)
-        assert len(df) == 3
+        result = transform(camstar_csv, config, n_rows=3)
+        assert len(result.valid) == 3
 
 
 class TestCLIGenerateIntegration:

@@ -5,7 +5,6 @@ description: >
   Track_out for some rows is millisecond Unix epoch (integer string), others are
   ISO date strings. Hold as Japanese: なし=false, 品質/技術=true.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
   separator: "\t"

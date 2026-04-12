@@ -8,7 +8,6 @@ description: >
   Recipe row 0 contains an embedded comma: "M1_ETCH,V3".
   On Hold? uses Y/N/yes/no/YES/blank.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
   sheet_name: OperatorLog

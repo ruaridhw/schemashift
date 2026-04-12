@@ -7,7 +7,6 @@ description: >
   Last row is a TOTAL summary — must be filtered before transformation.
   Hold as Y/N strings.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 3
   sheet_name: LotMovement

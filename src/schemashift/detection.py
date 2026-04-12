@@ -1,7 +1,7 @@
-"""Auto-detect which registered FormatConfig matches a file's columns."""
+"""Auto-detect which registered TransformSpec matches a file's columns."""
 
 from schemashift.errors import AmbiguousFormatError
-from schemashift.models import FormatConfig
+from schemashift.models import TransformSpec
 from schemashift.registry import Registry
 
 
@@ -9,7 +9,7 @@ def detect_format(
     file_columns: list[str],
     registry: Registry,
     min_score: float = 0.4,
-) -> FormatConfig | None:
+) -> TransformSpec | None:
     """Detect which registered config matches a file's columns.
 
     A config matches when the file's column set is a superset of the config's
@@ -22,15 +22,15 @@ def detect_format(
         min_score: Minimum specificity score required for a match.
 
     Returns:
-        The matching FormatConfig when exactly one config matches, or None when
+        The matching TransformSpec when exactly one config matches, or None when
         no configs match.
 
     Raises:
         AmbiguousFormatError: When two or more configs match.
     """
     column_set = set(file_columns)
-    scored_matches: list[tuple[float, FormatConfig]] = []
-    subset_matches: list[FormatConfig] = []
+    scored_matches: list[tuple[float, TransformSpec]] = []
+    subset_matches: list[TransformSpec] = []
 
     for config in registry.list_configs():
         required = config.source_columns()

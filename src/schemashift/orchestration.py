@@ -4,44 +4,49 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import dataframely as dy
 import polars as pl
 
 from schemashift.errors import FormatDetectionError, ReviewRejectedError
-from schemashift.models import FormatConfig, ReaderConfig
+from schemashift.models import ReaderConfig, TransformSpec
 from schemashift.readers import read_header
 from schemashift.registry import Registry
-from schemashift.transform import _transform, transform
+from schemashift.result import TransformResult
+from schemashift.transform import transform
+from schemashift.validation import SchemaConfig
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
-
-    from schemashift.target_schema import TargetSchema
 
 
 def smart_transform(
     path: Path,
     registry: Registry,
-    target_schema: "TargetSchema | None" = None,
+    target_schema: SchemaConfig | None = None,
+    schema: SchemaConfig | type[dy.Schema] | None = None,
     llm: "BaseChatModel | None" = None,
-    review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
+    review_fn: Callable[[TransformSpec, pl.DataFrame], TransformSpec | None] | None = None,
     auto_register: bool = False,
-    example_configs: list[FormatConfig] | None = None,
+    example_configs: list[TransformSpec] | None = None,
     max_retries: int = 2,
     n_sample_rows: int = 15,
     reader_config: ReaderConfig | None = None,
-) -> pl.DataFrame:
+    *,
+    strict: bool = False,
+) -> TransformResult:
     """Full detect-or-generate flow.
 
     1. Try auto-detect from registry.
     2. If miss and LLM available: generate config.
     3. If review_fn provided: pass config + sample to reviewer.
     4. If auto_register: save to registry.
-    5. Apply config; optionally validate against target_schema.
+    5. Apply config and validate against schema.
 
     Args:
         path: Source file path.
         registry: Registry to search and optionally register to.
-        target_schema: Required for LLM generation and output validation.
+        target_schema: Deprecated. Use ``schema`` instead.
+        schema: Output schema for validation.
         llm: LangChain BaseChatModel.
         review_fn: callback(config, sample_df) -> config | None. None = reject.
         auto_register: Register LLM-generated config automatically.
@@ -49,15 +54,17 @@ def smart_transform(
         max_retries: Max LLM retries.
         n_sample_rows: Rows to sample for LLM.
         reader_config: Optional reader configuration forwarded to all file reads.
+        strict: If True, raise on validation failures.
 
     Returns:
-        Transformed :class:`polars.DataFrame`.
+        A :class:`TransformResult` with valid rows and failure details.
 
     Raises:
         FormatDetectionError: No match and no LLM.
         ValueError: LLM needed but target_schema not provided.
         LLMGenerationError: LLM fails after all retries.
         ReviewRejectedError: review_fn returned None.
+        SchemaValidationError: When *strict* is True and validation fails.
     """
     config = _resolve_config(
         path=path,
@@ -71,13 +78,7 @@ def smart_transform(
         n_sample_rows=n_sample_rows,
         reader_config=reader_config,
     )
-    lf = _transform(path, config)
-    if target_schema is not None:
-        target_schema.validate_lazy(lf)
-    df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
-    if target_schema is not None:
-        target_schema.validate_eager(df)
-    return df
+    return transform(path, config, schema=schema, strict=strict)
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +90,7 @@ def _detect_config(
     path: Path,
     registry: Registry,
     reader_config: ReaderConfig | None = None,
-) -> FormatConfig | None:
+) -> TransformSpec | None:
     from schemashift.detection import detect_format  # noqa: PLC0415
 
     return detect_format(read_header(path, reader_config), registry)
@@ -98,15 +99,15 @@ def _detect_config(
 def _resolve_config(
     path: Path,
     registry: Registry,
-    target_schema: "TargetSchema | None",
+    target_schema: SchemaConfig | None,
     llm: "BaseChatModel | None",
-    review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None,
+    review_fn: Callable[[TransformSpec, pl.DataFrame], TransformSpec | None] | None,
     auto_register: bool,
-    example_configs: list[FormatConfig] | None,
+    example_configs: list[TransformSpec] | None,
     max_retries: int,
     n_sample_rows: int,
     reader_config: ReaderConfig | None = None,
-) -> FormatConfig:
+) -> TransformSpec:
     config = _detect_config(path, registry, reader_config)
     if config is not None:
         return config
@@ -138,14 +139,14 @@ def _resolve_config(
 
 def _review_generated_config(
     path: Path,
-    config: FormatConfig,
-    review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None,
-) -> FormatConfig:
+    config: TransformSpec,
+    review_fn: Callable[[TransformSpec, pl.DataFrame], TransformSpec | None] | None,
+) -> TransformSpec:
     if review_fn is None:
         return config
 
-    sample_df = transform(path, config, n_rows=10)
-    reviewed = review_fn(config, sample_df)
+    result = transform(path, config, n_rows=10)
+    reviewed = review_fn(config, result.valid)
     if reviewed is None:
         raise ReviewRejectedError("Config was rejected by review_fn")
     return reviewed

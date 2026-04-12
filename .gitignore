@@ -14,3 +14,4 @@ dist/
 docs/_build/
 plans/
 .gitnexus
+.DS_Store

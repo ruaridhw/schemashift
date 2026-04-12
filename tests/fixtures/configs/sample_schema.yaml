@@ -1,15 +1,15 @@
 name: "test_schema"
 description: "Test target schema"
 columns:
-  - name: id
+  id:
     type: str
-    required: true
+    nullable: false
     description: "Unique ID"
-  - name: value
+  value:
     type: float64
-    required: true
+    nullable: false
     description: "Numeric value"
-  - name: label
+  label:
     type: str
-    required: false
+    nullable: true
     description: "Optional label"
