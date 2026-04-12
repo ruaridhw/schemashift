@@ -1,5 +1,12 @@
 """Custom exception hierarchy for schemashift."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from schemashift.result import FailureInfo
+
 
 class SchemaShiftError(Exception):
     """Base exception for all schemashift errors."""
@@ -31,6 +38,10 @@ class FormatDetectionError(SchemaShiftError):
     """Raised when automatic format detection fails."""
 
 
+class ReviewRejectedError(SchemaShiftError):
+    """Raised when a review_fn callback rejects a generated config by returning None."""
+
+
 class AmbiguousFormatError(FormatDetectionError):
     """Raised when multiple formats match with equal confidence."""
 
@@ -40,7 +51,14 @@ class AmbiguousFormatError(FormatDetectionError):
 
 
 class SchemaValidationError(SchemaShiftError):
-    """Raised when a DataFrame does not conform to a TargetSchema."""
+    """Raised when a DataFrame does not conform to the schema.
+
+    In strict mode, carries a ``.failures`` attribute with row-level details.
+    """
+
+    def __init__(self, message: str, failures: FailureInfo | None = None) -> None:
+        super().__init__(message)
+        self.failures = failures
 
 
 class UnsupportedFileError(SchemaShiftError):

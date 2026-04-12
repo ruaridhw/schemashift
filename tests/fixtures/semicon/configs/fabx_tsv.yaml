@@ -4,7 +4,6 @@ description: >
   Sentinel value 0 for missing track_out (L005005 still in process).
   hold as 0/1 integer.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
   separator: "\t"

@@ -1,21 +1,20 @@
-"""Core transform engine: apply a FormatConfig to a file."""
+"""Core transform engine: apply a TransformSpec to a file."""
 
-from collections.abc import Callable
+import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
 
+import dataframely as dy
 import polars as pl
 
 from schemashift.dsl import parse_and_compile
 from schemashift.dtypes import DTYPE_MAP
-from schemashift.errors import DSLRuntimeError, DSLSyntaxError, FormatDetectionError
-from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.errors import DSLSyntaxError, SchemaValidationError
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.readers import read_file
-from schemashift.registry import Registry
+from schemashift.result import FailureInfo, TransformResult
+from schemashift.validation import SchemaConfig, resolve_schema
 
-if TYPE_CHECKING:
-    from schemashift.target_schema import TargetSchema
-
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -23,34 +22,79 @@ if TYPE_CHECKING:
 
 
 def transform(
-    path: str | Path,
-    config: FormatConfig,
-    reader_config: ReaderConfig | None = None,
-) -> pl.LazyFrame:
-    """Apply a FormatConfig to a file and return a transformed LazyFrame.
-
-    Steps:
-    1. Read the file using :func:`~schemashift.readers.read_file`.
-    2. Build one Polars expression per ColumnMapping.
-    3. Optionally drop columns not referenced by any mapping.
-    4. Apply dtype casting where specified.
-    5. Apply fill_null where specified.
+    path: Path,
+    config: TransformSpec,
+    schema: SchemaConfig | type[dy.Schema] | None = None,
+    *,
+    strict: bool = False,
+    n_rows: int | None = None,
+) -> TransformResult:
+    """Apply a TransformSpec to a file and return transformed + validated data.
 
     Args:
         path: Path to the source file.
-        config: FormatConfig describing how to map columns.
-        reader_config: Optional low-level reader options (overrides
-            ``config.reader`` when provided).
+        config: TransformSpec describing how to map columns.
+        schema: Override output schema. Falls back to ``config.output_schema``.
+        strict: If True, raise :class:`SchemaValidationError` when any validation
+            failures exist.
+        n_rows: If given, collect only the first *n_rows* rows (useful for
+            previewing or validating a config without reading the whole file).
 
     Returns:
-        A :class:`polars.LazyFrame` with the transformed columns.
+        A :class:`TransformResult` with valid rows and failure details.
 
     Raises:
+        SchemaValidationError: When *strict* is True and validation fails.
         DSLRuntimeError: When a DSL expression fails to evaluate.
         ReaderError: When the file cannot be read.
     """
-    effective_reader = reader_config if reader_config is not None else config.reader
-    lf = read_file(path, effective_reader)
+    # --- Build and apply expressions ---
+    lf = read_file(path, config.reader)
+    expressions, expression_errors = _build_expressions_lenient(config)
+
+    lf = lf.select(expressions) if config.drop_unmapped else lf.with_columns(expressions)
+
+    if n_rows is not None:
+        lf = lf.limit(n_rows)
+
+    df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
+
+    # --- Resolve schema and validate ---
+    resolved_schema = schema or config.output_schema
+    if resolved_schema is not None:
+        dy_schema = resolve_schema(resolved_schema)
+        filter_result = dy_schema.filter(df)
+        valid_df = filter_result.result
+        schema_failures = filter_result.failure
+    else:
+        valid_df = df
+        schema_failures = None
+
+    failures = FailureInfo(
+        schema_failures=schema_failures,
+        expression_errors=expression_errors,
+    )
+    result = TransformResult(valid=valid_df, failures=failures)
+
+    if strict and result.failures.has_failures:
+        raise SchemaValidationError(
+            _format_failure_message(failures),
+            failures=failures,
+        )
+
+    return result
+
+
+def _transform(
+    path: Path,
+    config: TransformSpec,
+) -> pl.LazyFrame:
+    """Internal: apply a TransformSpec and return a LazyFrame (not collected).
+
+    Used by the CLI for streaming sinks and by orchestration functions that
+    need to validate the schema lazily before collecting.
+    """
+    lf = read_file(path, config.reader)
     expressions = _build_expressions(config)
 
     if config.drop_unmapped:
@@ -58,11 +102,11 @@ def transform(
     return lf.with_columns(expressions)
 
 
-def validate_config(config: FormatConfig) -> list[str]:
-    """Validate a FormatConfig by parsing all DSL expressions and checking dtypes.
+def validate_config(config: TransformSpec) -> list[str]:
+    """Validate a TransformSpec by parsing all DSL expressions and checking dtypes.
 
     Args:
-        config: The FormatConfig to validate.
+        config: The TransformSpec to validate.
 
     Returns:
         A list of error message strings. An empty list means the config is valid.
@@ -86,175 +130,52 @@ def validate_config(config: FormatConfig) -> list[str]:
     return errors
 
 
-def dry_run(config: FormatConfig, path: str | Path, n_rows: int = 10) -> pl.DataFrame:
-    """Apply config to the first *n_rows* of a file and return the result.
-
-    Args:
-        config: FormatConfig to apply.
-        path: Path to the sample file.
-        n_rows: Number of rows to collect.
-
-    Returns:
-        A :class:`polars.DataFrame` containing the transformed rows.
-
-    Raises:
-        Any error raised by :func:`transform` or Polars collection.
-    """
-    lf = transform(path, config)
-    result: pl.DataFrame = lf.limit(n_rows).collect()  # ty: ignore[invalid-assignment]
-    return result
-
-
-def auto_transform(
-    path: str | Path,
-    registry: Registry,
-) -> pl.LazyFrame:
-    """Auto-detect the format from the registry and transform the file.
-
-    Args:
-        path: Path to the source file.
-        registry: Registry to search for a matching config.
-
-    Returns:
-        A transformed :class:`polars.LazyFrame`.
-
-    Raises:
-        FormatDetectionError: When no config matches the file's columns.
-        AmbiguousFormatError: When multiple configs match.
-    """
-    from schemashift.detection import detect_format
-    from schemashift.readers import read_header
-
-    columns = read_header(path)
-    config = detect_format(columns, registry)
-
-    if config is None:
-        raise FormatDetectionError(
-            f"No registered config matches the columns found in '{path}'. Columns present: {columns}"
-        )
-
-    return transform(path, config)
-
-
-def smart_transform(
-    path: str | Path,
-    registry: Registry,
-    target_schema: "TargetSchema | None" = None,
-    llm: Any = None,  # ANNOT: the typing here should be stronger
-    review_fn: Callable[[FormatConfig, pl.DataFrame], FormatConfig | None] | None = None,
-    auto_register: bool = False,
-    example_configs: list[FormatConfig] | None = None,
-    max_retries: int = 2,
-    n_sample_rows: int = 15,
-) -> pl.LazyFrame:
-    """Full detect-or-generate flow.
-
-    1. Try auto-detect from registry.
-    2. If miss and LLM available: generate config.
-    3. If review_fn provided: pass config + sample to reviewer.
-    4. If auto_register: save to registry.
-    5. Apply config; optionally validate against target_schema.
-
-    Args:
-        path: Source file path.
-        registry: Registry to search and optionally register to.
-        target_schema: Required for LLM generation and output validation.
-        llm: LangChain BaseChatModel.
-        review_fn: callback(config, sample_df) -> config | None. None = reject.
-        auto_register: Register LLM-generated config automatically.
-        example_configs: Example configs for LLM prompt.
-        max_retries: Max LLM retries.
-        n_sample_rows: Rows to sample for LLM.
-
-    Returns:
-        Transformed pl.LazyFrame.
-
-    Raises:
-        FormatDetectionError: No match and no LLM, or review_fn rejected.
-        ValueError: LLM needed but target_schema not provided.
-        LLMGenerationError: LLM fails after all retries.
-    """
-    from schemashift.detection import detect_format
-    from schemashift.readers import read_header
-
-    # Try registry
-    columns = read_header(path)
-    config = detect_format(columns, registry)
-
-    if config is not None:
-        lf = transform(path, config)
-        if target_schema is not None:
-            target_schema.validate_lazy(lf)
-        return lf
-
-    # No match — need LLM
-    if llm is None:
-        raise FormatDetectionError(
-            f"No registered config matches '{path}' and no LLM is configured. File columns: {columns}"
-        )
-    if target_schema is None:
-        raise ValueError("target_schema is required for LLM config generation")
-
-    from schemashift.llm import generate_config as _llm_generate
-
-    config = _llm_generate(
-        path=str(path),
-        target_schema=target_schema,
-        llm=llm,
-        example_configs=example_configs,
-        max_retries=max_retries,
-        n_sample_rows=n_sample_rows,
-    )
-
-    # Review callback
-    if review_fn is not None:
-        sample_df = dry_run(config, path, n_rows=10)
-        reviewed = review_fn(config, sample_df)
-        if reviewed is None:
-            raise FormatDetectionError("Config was rejected by review_fn")
-        config = reviewed
-
-    if auto_register:
-        registry.register(config)
-
-    lf = transform(path, config)
-    if target_schema is not None:
-        target_schema.validate_lazy(lf)
-    return lf
-
-
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
 
 
-def _build_expressions(config: FormatConfig) -> list[pl.Expr]:
+def _build_expressions(config: TransformSpec) -> list[pl.Expr]:
     """Build a list of Polars expressions for the given config's column mappings."""
+    return [_mapping_to_expr(mapping) for mapping in config.columns]
+
+
+def _build_expressions_lenient(config: TransformSpec) -> tuple[list[pl.Expr], dict[str, str]]:
+    """Build expressions with lenient error handling.
+
+    Returns a tuple of (expressions, expression_errors). Failed expressions
+    produce a null-literal column so the pipeline can continue and collect
+    all errors at once.
+    """
     expressions: list[pl.Expr] = []
+    expression_errors: dict[str, str] = {}
 
     for mapping in config.columns:
-        expr = _mapping_to_expr(mapping)
-        expressions.append(expr)
+        try:
+            expr = _mapping_to_expr(mapping, strict_cast=False)
+            expressions.append(expr)
+        except Exception as exc:
+            logger.warning("Expression error for column '%s': %s", mapping.target, exc)
+            expression_errors[mapping.target] = str(exc)
+            expressions.append(pl.lit(None).alias(mapping.target))
 
-    return expressions
+    return expressions, expression_errors
 
 
-def _mapping_to_expr(mapping: ColumnMapping) -> pl.Expr:
-    """Convert a single ColumnMapping to a Polars expression."""
+def _mapping_to_expr(mapping: ColumnMapping, *, strict_cast: bool = True) -> pl.Expr:
+    """Convert a single ColumnMapping to a Polars expression.
+
+    Args:
+        mapping: The column mapping to convert.
+        strict_cast: If False, use non-strict casting (partial failures become null).
+    """
     if mapping.source is not None:
         expr = pl.col(mapping.source).alias(mapping.target)
     elif mapping.expr is not None:
-        try:
-            compiled = parse_and_compile(mapping.expr)
-        except DSLSyntaxError as exc:
-            raise DSLRuntimeError(
-                f"DSL syntax error for target '{mapping.target}': {exc}",
-                expression=mapping.expr,
-                target=mapping.target,
-            ) from exc
+        compiled = parse_and_compile(mapping.expr)
         expr = compiled.alias(mapping.target)
-    elif mapping.constant is not None:
-        # constant
+    elif mapping.has_constant():
+        # constant (may be None, broadcasting nulls)
         expr = pl.lit(mapping.constant).alias(mapping.target)
     else:
         raise ValueError(f"ColumnMapping {mapping} has neither source nor expr nor constant")
@@ -263,10 +184,21 @@ def _mapping_to_expr(mapping: ColumnMapping) -> pl.Expr:
     if mapping.dtype is not None:
         dtype = DTYPE_MAP.get(mapping.dtype)
         if dtype is not None:
-            expr = expr.cast(dtype)
+            expr = expr.cast(dtype, strict=strict_cast)
 
     # Apply fill_null
-    if mapping.fillna is not None:
+    if mapping.has_fillna():
         expr = expr.fill_null(pl.lit(mapping.fillna))
 
     return expr
+
+
+def _format_failure_message(failures: FailureInfo) -> str:
+    """Format a human-readable message from FailureInfo for SchemaValidationError."""
+    parts: list[str] = ["Schema validation failed:"]
+    for col, msg in failures.expression_errors.items():
+        parts.append(f"  - Expression error in column '{col}': {msg}")
+    for rule, count in (failures.counts or {}).items():
+        if not rule.startswith("expression_error:"):
+            parts.append(f"  - Rule '{rule}' failed for {count} row(s)")
+    return "\n".join(parts)

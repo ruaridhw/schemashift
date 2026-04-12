@@ -6,7 +6,6 @@ description: >
   Lot IDs are zero-padded 6-digit integers without the "L" prefix.
   Timestamps in DD.MM.YYYY HH:MM:SS format. Hold as Ja/Nein.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
   separator: ";"

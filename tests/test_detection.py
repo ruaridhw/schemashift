@@ -4,7 +4,7 @@ import pytest
 
 from schemashift.detection import detect_format
 from schemashift.errors import AmbiguousFormatError
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.registry import DictRegistry
 
 # ---------------------------------------------------------------------------
@@ -12,16 +12,16 @@ from schemashift.registry import DictRegistry
 # ---------------------------------------------------------------------------
 
 
-def _make_config(name: str, source_cols: list[str]) -> FormatConfig:
-    """Build a FormatConfig that references the given source column names."""
+def _make_config(name: str, source_cols: list[str]) -> TransformSpec:
+    """Build a TransformSpec that references the given source column names."""
     columns = [ColumnMapping(target=f"out_{c}", source=c) for c in source_cols]
-    return FormatConfig(name=name, columns=columns)
+    return TransformSpec(name=name, columns=columns)
 
 
-def _make_expr_config(name: str, expr_cols: list[str]) -> FormatConfig:
-    """Build a FormatConfig that references columns via DSL expr."""
+def _make_expr_config(name: str, expr_cols: list[str]) -> TransformSpec:
+    """Build a TransformSpec that references columns via DSL expr."""
     columns = [ColumnMapping(target="result", expr=" + ".join(f'col("{c}")' for c in expr_cols))]
-    return FormatConfig(name=name, columns=columns)
+    return TransformSpec(name=name, columns=columns)
 
 
 # ---------------------------------------------------------------------------
@@ -59,14 +59,13 @@ class TestDetectFormat:
         assert "format_b" in exc_info.value.candidates
 
     def test_partial_match_file_has_extra_columns(self) -> None:
-        """File has more columns than the config needs — should still match."""
+        """Low-specificity matches fall below the default threshold."""
         reg = DictRegistry()
         cfg = _make_config("minimal", ["id"])
         reg.register(cfg)
 
         result = detect_format(["id", "name", "amount", "category", "active"], reg)
-        assert result is not None
-        assert result.name == "minimal"
+        assert result is None
 
     def test_empty_registry_returns_none(self) -> None:
         reg = DictRegistry()
@@ -116,3 +115,20 @@ class TestDetectFormat:
         result = detect_format(["col_a", "col_b", "extra"], reg)
         assert result is not None
         assert result.name == "matching"
+
+    def test_prefers_more_specific_match(self) -> None:
+        reg = DictRegistry()
+        reg.register(_make_config("minimal", ["id", "amount"]))
+        reg.register(_make_config("specific", ["id", "amount", "name"]))
+
+        result = detect_format(["id", "amount", "name"], reg)
+        assert result is not None
+        assert result.name == "specific"
+
+    def test_threshold_can_be_overridden(self) -> None:
+        reg = DictRegistry()
+        reg.register(_make_config("minimal", ["id"]))
+
+        result = detect_format(["id", "name", "amount", "category", "active"], reg, min_score=0.2)
+        assert result is not None
+        assert result.name == "minimal"

@@ -2,7 +2,7 @@
 
 import pytest
 
-from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.models import ColumnMapping, ReaderConfig, TransformSpec
 from schemashift.transform import transform
 
 
@@ -36,7 +36,7 @@ class TestExcelBasic:
                 [2, "Bob", 200],
             ],
         )
-        config = FormatConfig(
+        config = TransformSpec(
             name="t",
             reader=ReaderConfig(sheet_name="Sheet1"),
             columns=[
@@ -44,10 +44,10 @@ class TestExcelBasic:
                 ColumnMapping(target="user_name", source="name"),
             ],
         )
-        result = transform(path, config).collect()
-        assert set(result.columns) == {"user_id", "user_name"}
-        assert len(result) == 2
-        assert result["user_name"].to_list() == ["Alice", "Bob"]
+        result = transform(path, config)
+        assert set(result.valid.columns) == {"user_id", "user_name"}
+        assert len(result.valid) == 2
+        assert result.valid["user_name"].to_list() == ["Alice", "Bob"]
 
     def test_excel_with_skip_rows(self, tmp_path):
         """Excel with junk header rows before real data."""
@@ -64,7 +64,7 @@ class TestExcelBasic:
             header_rows_before=0,
         )
 
-        config = FormatConfig(
+        config = TransformSpec(
             name="t",
             reader=ReaderConfig(sheet_name="Sheet1", skip_rows=3),
             columns=[
@@ -72,9 +72,9 @@ class TestExcelBasic:
                 ColumnMapping(target="user_name", source="name"),
             ],
         )
-        result = transform(path, config).collect()
-        assert set(result.columns) == {"user_id", "user_name"}
-        assert len(result) == 2
+        result = transform(path, config)
+        assert set(result.valid.columns) == {"user_id", "user_name"}
+        assert len(result.valid) == 2
 
     def test_excel_named_sheet(self, tmp_path):
         """Read from a specific named sheet."""
@@ -92,7 +92,7 @@ class TestExcelBasic:
         path = tmp_path / "multi_sheet.xlsx"
         wb.save(str(path))
 
-        config = FormatConfig(
+        config = TransformSpec(
             name="t",
             reader=ReaderConfig(sheet_name="WIP_Detail"),
             columns=[
@@ -100,10 +100,10 @@ class TestExcelBasic:
                 ColumnMapping(target="wfrs", source="wafer_count"),
             ],
         )
-        result = transform(str(path), config).collect()
-        assert set(result.columns) == {"lot", "wfrs"}
-        assert len(result) == 2
-        assert result["lot"].to_list() == ["L001", "L002"]
+        result = transform(str(path), config)
+        assert set(result.valid.columns) == {"lot", "wfrs"}
+        assert len(result.valid) == 2
+        assert result.valid["lot"].to_list() == ["L001", "L002"]
 
     def test_excel_string_sheet_index(self, tmp_path):
         """Sheet name as integer index."""
@@ -116,13 +116,13 @@ class TestExcelBasic:
         path = tmp_path / "indexed.xlsx"
         wb.save(str(path))
 
-        config = FormatConfig(
+        config = TransformSpec(
             name="t",
             reader=ReaderConfig(sheet_name=0),  # first sheet by index
             columns=[ColumnMapping(target="a", source="col_a")],
         )
-        result = transform(str(path), config).collect()
-        assert result["a"].to_list() == ["x"]
+        result = transform(str(path), config)
+        assert result.valid["a"].to_list() == ["x"]
 
 
 class TestExcelFromPRD:
@@ -190,7 +190,7 @@ class TestExcelFromPRD:
         path = tmp_path / "smartfactory.xlsx"
         wb.save(str(path))
 
-        config = FormatConfig(
+        config = TransformSpec(
             name="smartfactory_lot_movement",
             reader=ReaderConfig(skip_rows=3, sheet_name="WIP_Detail"),
             columns=[
@@ -211,13 +211,13 @@ class TestExcelFromPRD:
                 ColumnMapping(target="data_source", constant="smartfactory"),
             ],
         )
-        result = transform(str(path), config).collect()
-        assert "lot_id" in result.columns
-        assert "hold_flag" in result.columns
-        assert "data_source" in result.columns
-        assert result["lot_id"].to_list()[0] == "L001234"
-        assert result["hold_flag"].to_list() == [False, True]
-        assert result["data_source"].n_unique() == 1
-        assert result["data_source"][0] == "smartfactory"
-        assert result["priority"].to_list()[0] == 1
-        assert result["priority"].to_list()[1] == 3
+        result = transform(str(path), config)
+        assert "lot_id" in result.valid.columns
+        assert "hold_flag" in result.valid.columns
+        assert "data_source" in result.valid.columns
+        assert result.valid["lot_id"].to_list()[0] == "L001234"
+        assert result.valid["hold_flag"].to_list() == [False, True]
+        assert result.valid["data_source"].n_unique() == 1
+        assert result.valid["data_source"][0] == "smartfactory"
+        assert result.valid["priority"].to_list()[0] == 1
+        assert result.valid["priority"].to_list()[1] == 3

@@ -6,7 +6,6 @@ description: >
   Priority as text: Hot=1, Normal=2, Low=3, Monitoring=4.
   Hold (on_hold) as mixed JSON types: true/false, "Yes"/"No", 1/0.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
 columns:

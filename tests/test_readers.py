@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import openpyxl
 import polars as pl
 import pytest
 
@@ -18,7 +19,7 @@ EXPECTED_COLUMNS = ["id", "name", "amount", "category", "active"]
 EXPECTED_ROW_COUNT = 5
 
 
-@pytest.fixture()
+@pytest.fixture
 def parquet_file(tmp_path: Path) -> Path:
     df = pl.DataFrame(
         {
@@ -34,12 +35,9 @@ def parquet_file(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture()
+@pytest.fixture
 def xlsx_file(tmp_path: Path) -> Path:
     """Create a small Excel fixture programmatically (requires fastexcel/openpyxl)."""
-    pytest.importorskip("openpyxl")
-    import openpyxl
-
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Sheet1"
@@ -58,7 +56,7 @@ def xlsx_file(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.fixture()
+@pytest.fixture
 def csv_with_skip_rows(tmp_path: Path) -> Path:
     content = "# comment line\n# another comment\nid,name,value\n1,Alice,10\n2,Bob,20\n"
     path = tmp_path / "skipped.csv"
@@ -174,7 +172,7 @@ class TestUnsupportedExtension:
     def test_unknown_extension_raises_unsupported_file_error(self, tmp_path):
         f = tmp_path / "data.feather"
         f.write_text("dummy")
-        with pytest.raises(UnsupportedFileError, match=".feather"):
+        with pytest.raises(UnsupportedFileError, match=r"\.feather"):
             read_file(f)
 
     def test_no_extension_raises_unsupported_file_error(self, tmp_path):

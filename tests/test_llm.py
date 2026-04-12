@@ -9,8 +9,8 @@ from langchain_core.messages import AIMessage
 
 from schemashift.errors import LLMGenerationError
 from schemashift.llm import build_prompt, generate_config
-from schemashift.models import ColumnMapping, FormatConfig
-from schemashift.target_schema import TargetColumn, TargetSchema
+from schemashift.models import ColumnMapping, TransformSpec
+from schemashift.validation import ColumnConstraints, SchemaConfig
 
 
 class FakeToolCallingModel(FakeMessagesListChatModel):
@@ -28,12 +28,12 @@ class FakeToolCallingModel(FakeMessagesListChatModel):
 class TestBuildPrompt:
     @pytest.fixture
     def schema(self):
-        return TargetSchema(
+        return SchemaConfig(
             name="test",
-            columns=[
-                TargetColumn(name="id", type="str", required=True, description="ID"),
-                TargetColumn(name="value", type="float64", required=True, description="Value"),
-            ],
+            columns={
+                "id": ColumnConstraints(type="str", nullable=False, description="ID"),
+                "value": ColumnConstraints(type="float64", nullable=False, description="Value"),
+            },
         )
 
     def test_contains_target_columns(self, schema):
@@ -56,7 +56,7 @@ class TestBuildPrompt:
 
     def test_includes_example_configs(self, schema):
         df = pl.DataFrame({"x": [1]})
-        ex = FormatConfig(name="ex", columns=[ColumnMapping(target="id", source="x")])
+        ex = TransformSpec(name="ex", columns=[ColumnMapping(target="id", source="x")])
         prompt = build_prompt(df, schema, ["x"], example_configs=[ex])
         assert '"ex"' in prompt
 
@@ -67,7 +67,7 @@ class TestBuildPrompt:
 
     def test_examples_note_includes_schema_name(self, schema):
         df = pl.DataFrame({"x": [1]})
-        ex = FormatConfig(name="ex", columns=[ColumnMapping(target="id", source="x")])
+        ex = TransformSpec(name="ex", columns=[ColumnMapping(target="id", source="x")])
         prompt = build_prompt(df, schema, ["x"], example_configs=[ex])
         assert "test" in prompt
         assert "same" in prompt
@@ -76,6 +76,17 @@ class TestBuildPrompt:
         df = pl.DataFrame({"x": [1]})
         prompt = build_prompt(df, schema, ["x"])
         assert "submit_format_config" in prompt
+
+    def test_custom_prompt_appended(self, schema):
+        df = pl.DataFrame({"x": [1]})
+        result = build_prompt(df, schema, ["x"], user_prompt="volume is in lots not wafers")
+        assert "Additional Context" in result
+        assert "volume is in lots not wafers" in result
+
+    def test_no_additional_context_when_prompt_none(self, schema):
+        df = pl.DataFrame({"x": [1]})
+        result = build_prompt(df, schema, ["x"], user_prompt=None)
+        assert "Additional Context" not in result
 
 
 class TestGenerateConfig:
@@ -87,12 +98,12 @@ class TestGenerateConfig:
 
     @pytest.fixture
     def schema(self):
-        return TargetSchema(
+        return SchemaConfig(
             name="students",
-            columns=[
-                TargetColumn(name="student", type="str", required=True, description="Student name"),
-                TargetColumn(name="grade", type="float64", required=True, description="Grade"),
-            ],
+            columns={
+                "student": ColumnConstraints(type="str", nullable=False, description="Student name"),
+                "grade": ColumnConstraints(type="float64", nullable=False, description="Grade"),
+            },
         )
 
     def _valid_args(self, name: str = "fmt") -> dict:

@@ -10,11 +10,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from schemashift.dsl import parse_and_compile
-from schemashift.dsl.parser import parse_dsl
 from schemashift.errors import DSLSyntaxError
-from schemashift.models import ColumnMapping, FormatConfig
-from schemashift.target_schema import TargetSchema
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.transform import transform
+from schemashift.validation import SchemaConfig
 
 # ---------------------------------------------------------------------------
 # Shared strategies
@@ -34,11 +33,11 @@ _col_name_short_st = st.text(
 
 
 # ---------------------------------------------------------------------------
-# 1. FormatConfig JSON round-trip
+# 1. TransformSpec JSON round-trip
 # ---------------------------------------------------------------------------
 
 
-class TestFormatConfigJsonRoundtrip:
+class TestTransformSpecJsonRoundtrip:
     @given(
         targets=st.lists(
             _lower_ident_st,
@@ -50,10 +49,10 @@ class TestFormatConfigJsonRoundtrip:
     @settings(max_examples=50)
     def test_source_only_config_roundtrips_via_json(self, targets: list[str]) -> None:
         columns = [ColumnMapping(target=t, source=f"src_{t}") for t in targets]
-        config = FormatConfig(name="test", columns=columns)
+        config = TransformSpec(name="test", columns=columns)
 
         json_str = config.model_dump_json()
-        restored = FormatConfig.model_validate_json(json_str)
+        restored = TransformSpec.model_validate_json(json_str)
 
         assert config.name == restored.name
         assert len(config.columns) == len(restored.columns)
@@ -72,10 +71,10 @@ class TestFormatConfigJsonRoundtrip:
     @settings(max_examples=50)
     def test_constant_only_config_roundtrips_via_json(self, targets: list[str]) -> None:
         columns = [ColumnMapping(target=t, constant="value") for t in targets]
-        config = FormatConfig(name="test_const", columns=columns)
+        config = TransformSpec(name="test_const", columns=columns)
 
         json_str = config.model_dump_json()
-        restored = FormatConfig.model_validate_json(json_str)
+        restored = TransformSpec.model_validate_json(json_str)
 
         assert config.name == restored.name
         assert len(config.columns) == len(restored.columns)
@@ -108,10 +107,10 @@ class TestSourceOnlyConfigProducesTargetColumns:
         df.write_csv(path)
 
         columns = [ColumnMapping(target=t, source=f"src_{t}") for t in targets]
-        config = FormatConfig(name="test", columns=columns)
+        config = TransformSpec(name="test", columns=columns)
 
-        result = transform(path, config).collect()
-        assert set(result.columns) == set(targets)
+        result = transform(path, config)
+        assert set(result.valid.columns) == set(targets)
 
     @given(
         targets=st.lists(
@@ -132,10 +131,10 @@ class TestSourceOnlyConfigProducesTargetColumns:
         df.write_csv(path)
 
         columns = [ColumnMapping(target=t, source=f"src_{t}") for t in targets]
-        config = FormatConfig(name="test", columns=columns)
+        config = TransformSpec(name="test", columns=columns)
 
-        result = transform(path, config).collect()
-        assert len(result) == n_rows
+        result = transform(path, config)
+        assert len(result.valid) == n_rows
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +187,7 @@ class TestDslParserNeverCrashes:
     def test_dsl_parser_raises_dsl_syntax_error_or_returns_ast(self, text: str) -> None:
         """Parser must either return an ASTNode or raise DSLSyntaxError — never crash."""
         try:
-            parse_dsl(text)
+            parse_and_compile(text)
         except DSLSyntaxError:
             pass  # Expected for invalid input
         except Exception as exc:
@@ -217,16 +216,16 @@ class TestConstantMappingRowCounts:
 
         # Include a source mapping alongside the constant so that Polars
         # select() can broadcast the literal to the correct row count.
-        config = FormatConfig(
+        config = TransformSpec(
             name="t",
             columns=[
                 ColumnMapping(target="id", source="x"),
                 ColumnMapping(target="out", constant=str(const_value)),
             ],
         )
-        result = transform(path, config).collect()
-        assert len(result) == n_rows
-        assert "out" in result.columns
+        result = transform(path, config)
+        assert len(result.valid) == n_rows
+        assert "out" in result.valid.columns
 
     @given(
         n_rows=st.integers(min_value=1, max_value=50),
@@ -243,20 +242,20 @@ class TestConstantMappingRowCounts:
         columns = [ColumnMapping(target="id", source="x")] + [
             ColumnMapping(target=f"col_{i}", constant="fixed") for i in range(n_cols)
         ]
-        config = FormatConfig(name="t", columns=columns)
-        result = transform(path, config).collect()
+        config = TransformSpec(name="t", columns=columns)
+        result = transform(path, config)
 
-        assert len(result) == n_rows
+        assert len(result.valid) == n_rows
         for i in range(n_cols):
-            assert f"col_{i}" in result.columns
+            assert f"col_{i}" in result.valid.columns
 
 
 # ---------------------------------------------------------------------------
-# 6. TargetSchema YAML round-trip
+# 6. SchemaConfig YAML round-trip
 # ---------------------------------------------------------------------------
 
 
-class TestTargetSchemaYamlRoundtrip:
+class TestSchemaConfigYamlRoundtrip:
     @given(
         col_names=st.lists(
             st.text(
@@ -274,25 +273,17 @@ class TestTargetSchemaYamlRoundtrip:
         schema_data = {
             "name": "test_schema",
             "description": "property test",
-            "columns": [
-                {
-                    "name": n,
-                    "type": "str",
-                    "required": True,
-                    "description": f"column {n}",
-                }
-                for n in col_names
-            ],
+            "columns": {n: {"type": "str", "nullable": False, "description": f"column {n}"} for n in col_names},
         }
 
         tmpdir = tempfile.mkdtemp()
         path = os.path.join(tmpdir, "schema.yaml")
         with open(path, "w") as f:
-            yaml.safe_dump(schema_data, f)
+            yaml.safe_dump(schema_data, f, sort_keys=False)
 
-        schema = TargetSchema.from_yaml(path)
+        schema = SchemaConfig.from_yaml(path)
         assert schema.name == "test_schema"
-        assert [c.name for c in schema.columns] == col_names
+        assert list(schema.columns.keys()) == col_names
 
     @given(
         col_names=st.lists(
@@ -307,16 +298,17 @@ class TestTargetSchemaYamlRoundtrip:
         )
     )
     @settings(max_examples=30)
-    def test_schema_required_columns_match(self, col_names: list[str]) -> None:
+    def test_schema_non_nullable_columns_match(self, col_names: list[str]) -> None:
         schema_data = {
             "name": "req_schema",
-            "columns": [{"name": n, "type": "str", "required": True} for n in col_names],
+            "columns": {n: {"type": "str", "nullable": False} for n in col_names},
         }
 
         tmpdir = tempfile.mkdtemp()
         path = os.path.join(tmpdir, "schema.yaml")
         with open(path, "w") as f:
-            yaml.safe_dump(schema_data, f)
+            yaml.safe_dump(schema_data, f, sort_keys=False)
 
-        schema = TargetSchema.from_yaml(path)
-        assert schema.required_columns() == col_names
+        schema = SchemaConfig.from_yaml(path)
+        non_nullable = [name for name, c in schema.columns.items() if not c.nullable]
+        assert non_nullable == col_names

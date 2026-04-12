@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from click.testing import CliRunner
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 from schemashift.cli import cli
-from schemashift.models import FormatConfig
+from schemashift.models import TransformSpec
 from schemashift.schema import get_schema, get_schema_path
 
 
@@ -20,7 +23,7 @@ class TestSchemaCommand:
         result = runner.invoke(cli, ["schema"])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["title"] == "FormatConfig"
+        assert data["title"] == "TransformSpec"
 
     def test_schema_contains_dollar_schema_key(self) -> None:
         runner = CliRunner()
@@ -35,7 +38,7 @@ class TestSchemaCommand:
         assert result.exit_code == 0
         assert "Schema written to" in result.output
         data = json.loads(out.read_text(encoding="utf-8"))
-        assert data["title"] == "FormatConfig"
+        assert data["title"] == "TransformSpec"
 
     def test_dtype_enum_contains_int32(self) -> None:
         runner = CliRunner()
@@ -56,7 +59,7 @@ class TestBundledSchema:
 
     def test_get_schema_returns_dict_with_title(self) -> None:
         schema = get_schema()
-        assert schema["title"] == "FormatConfig"
+        assert schema["title"] == "TransformSpec"
         assert "$schema" in schema
 
     def test_bundled_schema_is_fresh(self) -> None:
@@ -66,7 +69,7 @@ class TestBundledSchema:
         """
         bundled = get_schema()
         bundled_without_meta = {k: v for k, v in bundled.items() if k != "$schema"}
-        live = FormatConfig.model_json_schema()
+        live = TransformSpec.model_json_schema()
         assert bundled_without_meta == live, (
             "Bundled schema is out of date. Regenerate with:\n"
             "  uv run schemashift schema -o src/schemashift/schema/format_config.json"

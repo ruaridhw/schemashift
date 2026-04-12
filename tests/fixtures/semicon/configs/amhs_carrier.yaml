@@ -9,7 +9,6 @@ description: >
   Whitespace-only cells in seq and rte columns — treat as null.
   Hold as free text: "Quality Hold", "Eng Hold", "Engr", empty/whitespace = no hold.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
   separator: ","

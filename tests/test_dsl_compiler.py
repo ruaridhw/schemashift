@@ -1,12 +1,12 @@
 """Tests for the DSL compiler — parse_and_compile against real Polars DataFrames."""
 
+from datetime import timedelta
+
 import polars as pl
 import pytest
 
 from schemashift.dsl import parse_and_compile
-from schemashift.dsl.ast_nodes import BinaryOp, ColRef, CustomLookup, Literal, Lookup, WhenClause
-from schemashift.dsl.compiler import compile_dsl
-from schemashift.errors import DSLRuntimeError, DSLSyntaxError
+from schemashift.errors import DSLSyntaxError
 
 # ---------------------------------------------------------------------------
 # Column reference
@@ -410,6 +410,11 @@ class TestLogicalCompiled:
         result = df.select(parse_and_compile('col("X") == 1 | col("X") == 10').alias("out"))["out"].to_list()
         assert result == [True, False, True]
 
+    def test_logical_not(self) -> None:
+        df = pl.DataFrame({"flag": [True, False, True]})
+        result = df.select(parse_and_compile('not col("flag")').alias("out"))["out"].to_list()
+        assert result == [False, True, False]
+
 
 # ---------------------------------------------------------------------------
 # Datetime hour/minute/second/timestamp compiled
@@ -444,6 +449,15 @@ class TestDatetimeMethodsExtended:
         # 2024 row should have a larger timestamp than the 2023 row.
         assert ts_list[1] < ts_list[0]
 
+    def test_dt_timestamp_explicit_unit(self, datetime_df: pl.DataFrame) -> None:
+        result = datetime_df.select(parse_and_compile('col("ts").dt.timestamp("us")').alias("out"))
+        ts_list = result["out"].to_list()
+        assert all(t > 0 for t in ts_list)  # type: ignore[operator]
+
+    def test_dt_timestamp_invalid_unit_raises(self, datetime_df: pl.DataFrame) -> None:
+        with pytest.raises(DSLSyntaxError, match="unit"):
+            datetime_df.select(parse_and_compile('col("ts").dt.timestamp("s")').alias("out"))
+
 
 # ---------------------------------------------------------------------------
 # Compiler error paths
@@ -451,15 +465,6 @@ class TestDatetimeMethodsExtended:
 
 
 class TestCompilerErrorPaths:
-    def test_standalone_when_clause_raises_dsl_runtime_error(self) -> None:
-        """Compiling a bare WhenClause (not wrapped in WhenChain) should raise DSLRuntimeError."""
-        node = WhenClause(
-            condition=BinaryOp("==", ColRef("X"), Literal(1)),
-            value=Literal("yes"),
-        )
-        with pytest.raises(DSLRuntimeError):
-            compile_dsl(node)
-
     def test_cast_invalid_type_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
             parse_and_compile('col("X").cast("pandas")')
@@ -502,7 +507,7 @@ class TestLookup:
 
     def test_unknown_table_raises(self) -> None:
         with pytest.raises(DSLSyntaxError, match="Unknown lookup table"):
-            compile_dsl(Lookup(ColRef("X"), "nonexistent"))
+            parse_and_compile('lookup(col("X"), "nonexistent")')
 
 
 # ---------------------------------------------------------------------------
@@ -520,14 +525,9 @@ class TestCustomLookup:
 
     def test_numeric_key_to_string(self) -> None:
         df = pl.DataFrame({"X": ["1", "2", "3"]})
-        result = df.select(
-            compile_dsl(
-                CustomLookup(
-                    ColRef("X"),
-                    ((Literal("1"), Literal("One")), (Literal("2"), Literal("Two"))),
-                )
-            ).alias("out")
-        )["out"].to_list()
+        result = df.select(parse_and_compile('custom_lookup(col("X"), {"1": "One", "2": "Two"})').alias("out"))[
+            "out"
+        ].to_list()
         assert result == ["One", "Two", "3"]
 
     def test_bool_values(self) -> None:
@@ -546,10 +546,122 @@ class TestCustomLookup:
 
     def test_unknown_base_table_raises(self) -> None:
         with pytest.raises(DSLSyntaxError, match="Unknown base table"):
-            compile_dsl(
-                CustomLookup(
-                    ColRef("X"),
-                    ((Literal("a"), Literal("b")),),
-                    "nonexistent",
-                )
-            )
+            parse_and_compile('custom_lookup(col("X"), {"a": "b"}, "nonexistent")')
+
+
+# ---------------------------------------------------------------------------
+# New direct methods (is_not_null, floor, ceil, clip, pow, sqrt)
+# ---------------------------------------------------------------------------
+
+
+class TestNewDirectMethods:
+    def test_is_not_null(self) -> None:
+        df = pl.DataFrame({"X": [1, None, 3]})
+        result = df.select(parse_and_compile('col("X").is_not_null()').alias("out"))["out"].to_list()
+        assert result == [True, False, True]
+
+    def test_floor(self) -> None:
+        df = pl.DataFrame({"X": [1.7, 2.3, -1.1]})
+        result = df.select(parse_and_compile('col("X").floor()').alias("out"))["out"].to_list()
+        assert result == pytest.approx([1.0, 2.0, -2.0])
+
+    def test_ceil(self) -> None:
+        df = pl.DataFrame({"X": [1.1, 2.9, -1.1]})
+        result = df.select(parse_and_compile('col("X").ceil()').alias("out"))["out"].to_list()
+        assert result == pytest.approx([2.0, 3.0, -1.0])
+
+    def test_sqrt(self) -> None:
+        df = pl.DataFrame({"X": [4.0, 9.0, 16.0]})
+        result = df.select(parse_and_compile('col("X").sqrt()').alias("out"))["out"].to_list()
+        assert result == pytest.approx([2.0, 3.0, 4.0])
+
+    def test_clip(self) -> None:
+        df = pl.DataFrame({"X": [-5, 3, 15]})
+        result = df.select(parse_and_compile('col("X").clip(0, 10)').alias("out"))["out"].to_list()
+        assert result == [0, 3, 10]
+
+    def test_pow(self) -> None:
+        df = pl.DataFrame({"X": [2.0, 3.0, 4.0]})
+        result = df.select(parse_and_compile('col("X").pow(2)').alias("out"))["out"].to_list()
+        assert result == pytest.approx([4.0, 9.0, 16.0])
+
+
+# ---------------------------------------------------------------------------
+# New string methods (replace_all, lstrip, rstrip, count_matches, zfill)
+# ---------------------------------------------------------------------------
+
+
+class TestNewStringMethods:
+    def test_str_replace_all(self) -> None:
+        df = pl.DataFrame({"X": ["a.b.c", "d.e"]})
+        result = df.select(parse_and_compile('col("X").str.replace_all(".", "-")').alias("out"))["out"].to_list()
+        assert result == ["a-b-c", "d-e"]
+
+    def test_str_lstrip(self) -> None:
+        df = pl.DataFrame({"X": ["  hello  ", "  world"]})
+        result = df.select(parse_and_compile('col("X").str.lstrip()').alias("out"))["out"].to_list()
+        assert result == ["hello  ", "world"]
+
+    def test_str_rstrip(self) -> None:
+        df = pl.DataFrame({"X": ["  hello  ", "world  "]})
+        result = df.select(parse_and_compile('col("X").str.rstrip()').alias("out"))["out"].to_list()
+        assert result == ["  hello", "world"]
+
+    def test_str_count_matches(self) -> None:
+        df = pl.DataFrame({"X": ["aababc", "xyz"]})
+        result = df.select(parse_and_compile('col("X").str.count_matches("a")').alias("out"))["out"].to_list()
+        assert result == [3, 0]
+
+    def test_str_zfill(self) -> None:
+        df = pl.DataFrame({"X": ["42", "7", "100"]})
+        result = df.select(parse_and_compile('col("X").str.zfill(5)').alias("out"))["out"].to_list()
+        assert result == ["00042", "00007", "00100"]
+
+
+# ---------------------------------------------------------------------------
+# New datetime methods (quarter, week, weekday, ordinal_day, truncate,
+#                       total_seconds, millisecond, microsecond)
+# ---------------------------------------------------------------------------
+
+
+class TestNewDatetimeMethods:
+    @pytest.fixture
+    def dt_df(self) -> pl.DataFrame:
+        return pl.DataFrame(
+            {"ts": ["2024-03-15 14:35:52.123", "2023-11-07 09:05:01.456"]},
+        ).with_columns(pl.col("ts").str.to_datetime("%Y-%m-%d %H:%M:%S%.f").alias("ts"))
+
+    def test_dt_quarter(self, dt_df: pl.DataFrame) -> None:
+        result = dt_df.select(parse_and_compile('col("ts").dt.quarter()').alias("out"))
+        assert result["out"].to_list() == [1, 4]
+
+    def test_dt_week(self, dt_df: pl.DataFrame) -> None:
+        result = dt_df.select(parse_and_compile('col("ts").dt.week()').alias("out"))
+        assert result["out"].to_list() == [11, 45]
+
+    def test_dt_weekday(self, dt_df: pl.DataFrame) -> None:
+        # 2024-03-15 is a Friday (4), 2023-11-07 is a Tuesday (1)
+        result = dt_df.select(parse_and_compile('col("ts").dt.weekday()').alias("out"))
+        assert result["out"].to_list() == [5, 2]
+
+    def test_dt_ordinal_day(self, dt_df: pl.DataFrame) -> None:
+        result = dt_df.select(parse_and_compile('col("ts").dt.ordinal_day()').alias("out"))
+        assert result["out"].to_list() == [75, 311]
+
+    def test_dt_truncate(self, dt_df: pl.DataFrame) -> None:
+        result = dt_df.select(parse_and_compile('col("ts").dt.truncate("1d")').alias("out"))
+        dates = [str(d)[:10] for d in result["out"].to_list()]
+        assert dates == ["2024-03-15", "2023-11-07"]
+
+    def test_dt_millisecond(self, dt_df: pl.DataFrame) -> None:
+        result = dt_df.select(parse_and_compile('col("ts").dt.millisecond()').alias("out"))
+        assert result["out"].to_list() == [123, 456]
+
+    def test_dt_microsecond(self, dt_df: pl.DataFrame) -> None:
+        result = dt_df.select(parse_and_compile('col("ts").dt.microsecond()').alias("out"))
+        assert result["out"].to_list() == [123000, 456000]
+
+    def test_dt_total_seconds(self) -> None:
+        df = pl.DataFrame({"dur": [timedelta(hours=2), timedelta(minutes=30)]})
+        result = df.select(parse_and_compile('col("dur").dt.total_seconds()').alias("out"))
+        assert result["out"].to_list() == [7200, 1800]
