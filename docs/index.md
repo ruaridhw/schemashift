@@ -20,6 +20,15 @@ When a new format arrives with no matching config, `smart_transform()` sends the
 dataset schema to your LLM, validates the generated config end-to-end, and saves it to the registry
 so the next run is instant.
 
+```{raw} html
+<figure class="schemashift-visual schemashift-visual--hero">
+  <picture>
+    <source srcset="_static/visuals/pipeline-story-mobile.svg" media="(max-width: 67em)">
+    <img src="_static/visuals/pipeline-story.svg" alt="schemashift pipeline: source file detection, registry hit or LLM-generated TransformSpec, and validated Dataset output">
+  </picture>
+</figure>
+```
+
 ---
 
 ## Thirty-second example
