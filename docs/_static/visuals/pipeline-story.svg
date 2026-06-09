@@ -50,6 +50,6 @@
   <path class="arrow" d="M698 132 C739 143 756 175 766 194"/>
   <path class="miss" d="M698 280 C739 269 756 236 766 214"/>
 
-  <rect x="518" y="348" width="194" height="36" rx="18" fill="#fff" stroke="#cbd5e1"/>
-  <text class="note" x="615" y="371" text-anchor="middle">TransformSpec becomes reusable</text>
+  <text class="note" x="708" y="338">Generated TransformSpec</text>
+  <text class="note" x="708" y="356">is saved for reuse.</text>
 </svg>
