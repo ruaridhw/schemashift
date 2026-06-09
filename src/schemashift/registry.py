@@ -1,4 +1,4 @@
-"""Format config registries — in-memory and file-system backed."""
+"""TransformSpec registries — in-memory and file-system backed."""
 
 import json
 import re
@@ -6,23 +6,23 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from schemashift.errors import ConfigValidationError
-from schemashift.models import FormatConfig
-from schemashift.target_schema import TargetSchema
+from schemashift.models import TransformSpec
+from schemashift.validation import SchemaConfig
 
 
 class Registry(ABC):
-    """Abstract base registry for FormatConfig objects."""
+    """Abstract base registry for TransformSpec objects."""
 
     @abstractmethod
-    def get(self, name: str) -> FormatConfig | None:
+    def get(self, name: str) -> TransformSpec | None:
         """Return the config with the given name, or None if not found."""
 
     @abstractmethod
-    def register(self, config: FormatConfig) -> None:
+    def register(self, config: TransformSpec) -> None:
         """Store a config, replacing any existing config with the same name."""
 
     @abstractmethod
-    def list_configs(self) -> list[FormatConfig]:
+    def list_configs(self) -> list[TransformSpec]:
         """Return all registered configs."""
 
     @abstractmethod
@@ -32,8 +32,8 @@ class Registry(ABC):
         Returns True if the config existed and was removed, False otherwise.
         """
 
-    def load_schema(self, name: str | None = None) -> "TargetSchema | None":
-        """Load a target schema associated with this registry, if supported."""
+    def load_schema(self, name: str | None = None) -> SchemaConfig | None:
+        """Load a schema config associated with this registry, if supported."""
         return None
 
 
@@ -41,15 +41,15 @@ class DictRegistry(Registry):
     """In-memory registry suitable for testing and embedded use."""
 
     def __init__(self) -> None:
-        self._configs: dict[str, FormatConfig] = {}
+        self._configs: dict[str, TransformSpec] = {}
 
-    def get(self, name: str) -> FormatConfig | None:
+    def get(self, name: str) -> TransformSpec | None:
         return self._configs.get(name)
 
-    def register(self, config: FormatConfig) -> None:
+    def register(self, config: TransformSpec) -> None:
         self._configs[config.name] = config
 
-    def list_configs(self) -> list[FormatConfig]:
+    def list_configs(self) -> list[TransformSpec]:
         return list(self._configs.values())
 
     def delete(self, name: str) -> bool:
@@ -76,23 +76,23 @@ class FileSystemRegistry(Registry):
             )
         return self._path / f"{name}.json"
 
-    def get(self, name: str) -> FormatConfig | None:
+    def get(self, name: str) -> TransformSpec | None:
         p = self._config_path(name)
         if not p.exists():
             return None
         data = json.loads(p.read_text(encoding="utf-8"))
-        return FormatConfig.model_validate(data)
+        return TransformSpec.model_validate(data)
 
-    def register(self, config: FormatConfig) -> None:
+    def register(self, config: TransformSpec) -> None:
         p = self._config_path(config.name)
         p.write_text(config.model_dump_json(indent=2), encoding="utf-8")
 
-    def list_configs(self) -> list[FormatConfig]:
-        configs: list[FormatConfig] = []
+    def list_configs(self) -> list[TransformSpec]:
+        configs: list[TransformSpec] = []
         for p in sorted(self._path.glob("*.json")):
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
-                configs.append(FormatConfig.model_validate(data))
+                configs.append(TransformSpec.model_validate(data))
             except Exception as exc:
                 raise ConfigValidationError(f"Failed to load config from '{p}': {exc}") from exc
         return configs
@@ -104,8 +104,8 @@ class FileSystemRegistry(Registry):
             return True
         return False
 
-    def load_schema(self, name: str | None = None) -> "TargetSchema | None":
-        """Load a TargetSchema from the schemas/ subdirectory.
+    def load_schema(self, name: str | None = None) -> SchemaConfig | None:
+        """Load a SchemaConfig from the schemas/ subdirectory.
 
         If *name* is provided, loads ``{schemas_dir}/{name}.yaml`` (falling
         back to ``.yml``).  If *name* is ``None`` and exactly one schema file
@@ -118,7 +118,7 @@ class FileSystemRegistry(Registry):
         path = _resolve_schema_path(self._path / "schemas", name)
         if path is None:
             return None
-        return TargetSchema.from_yaml(path)
+        return SchemaConfig.from_yaml(path)
 
 
 def _resolve_schema_path(schemas_dir: Path, name: str | None = None) -> Path | None:

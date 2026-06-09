@@ -10,7 +10,7 @@ import pytest
 from click.testing import CliRunner
 
 from schemashift.cli import _resolve_schema, cli
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.registry import FileSystemRegistry
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ def registry_dir(tmp_path: Path) -> Path:
     """A temporary registry directory pre-populated with a config."""
     reg = FileSystemRegistry(tmp_path)
     reg.register(
-        FormatConfig(
+        TransformSpec(
             name="sample_format",
             description="Sample format for tests",
             columns=[
@@ -59,7 +59,7 @@ class TestValidateCommand:
         bad_file = tmp_path / "bad.json"
         bad_file.write_text('{"name": "bad", "columns": []}', encoding="utf-8")
         result = runner.invoke(cli, ["validate", str(bad_file)])
-        # FormatConfig requires at least one column, but pydantic v2 allows an
+        # TransformSpec requires at least one column, but pydantic v2 allows an
         # empty list for `list[ColumnMapping]`. It may pass or fail depending on
         # model validation. We only verify the command doesn't crash.
         assert result.exit_code in (0, 1)
@@ -152,12 +152,12 @@ SAMPLE_SCHEMA_YAML = """\
 name: test_schema
 description: Test target schema
 columns:
-  - name: id
+  id:
     type: str
-    required: true
-  - name: value
+    nullable: false
+  value:
     type: float64
-    required: false
+    nullable: true
 """
 
 
@@ -218,8 +218,9 @@ class TestResolveSchema:
 name: other_schema
 description: Other
 columns:
-  - name: col
+  col:
     type: str
+    nullable: false
 """
         (schemas_dir / "other.yaml").write_text(other_yaml, encoding="utf-8")
 
@@ -244,7 +245,7 @@ class TestGenerateCommand:
 
     @pytest.fixture
     def mock_config(self):
-        return FormatConfig(
+        return TransformSpec(
             name="generated_format",
             description="Auto-generated",
             columns=[ColumnMapping(target="id", source="ID")],

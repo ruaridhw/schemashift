@@ -7,7 +7,6 @@ description: >
   hold as Int8 (0/1). priority as Int8.
   4 distractor columns: yield_pct, defect_count, review_status, inspector.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
 columns:

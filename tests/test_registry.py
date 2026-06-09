@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from schemashift.errors import ConfigValidationError
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.registry import DictRegistry, FileSystemRegistry
 
 # ---------------------------------------------------------------------------
@@ -14,8 +14,8 @@ from schemashift.registry import DictRegistry, FileSystemRegistry
 # ---------------------------------------------------------------------------
 
 
-def _make_config(name: str = "test_config") -> FormatConfig:
-    return FormatConfig(
+def _make_config(name: str = "test_config") -> TransformSpec:
+    return TransformSpec(
         name=name,
         description="A test config",
         columns=[
@@ -57,8 +57,8 @@ class TestDictRegistry:
 
     def test_register_overwrites_existing(self) -> None:
         reg = DictRegistry()
-        reg.register(FormatConfig(name="x", description="v1", columns=[ColumnMapping(target="t", source="s")]))
-        reg.register(FormatConfig(name="x", description="v2", columns=[ColumnMapping(target="t", source="s")]))
+        reg.register(TransformSpec(name="x", description="v1", columns=[ColumnMapping(target="t", source="s")]))
+        reg.register(TransformSpec(name="x", description="v2", columns=[ColumnMapping(target="t", source="s")]))
         result = reg.get("x")
         assert result is not None
         assert result.description == "v2"
@@ -141,8 +141,8 @@ class TestFileSystemRegistry:
 
     def test_register_overwrites_existing_file(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
-        reg.register(FormatConfig(name="upd", description="v1", columns=[ColumnMapping(target="t", source="s")]))
-        reg.register(FormatConfig(name="upd", description="v2", columns=[ColumnMapping(target="t", source="s")]))
+        reg.register(TransformSpec(name="upd", description="v1", columns=[ColumnMapping(target="t", source="s")]))
+        reg.register(TransformSpec(name="upd", description="v2", columns=[ColumnMapping(target="t", source="s")]))
         result = reg.get("upd")
         assert result is not None
         assert result.description == "v2"
@@ -156,21 +156,21 @@ _SCHEMA_YAML = """\
 name: my_schema
 description: Test schema
 columns:
-  - name: id
+  id:
     type: str
-    required: true
-  - name: amount
+    nullable: false
+  amount:
     type: float64
-    required: false
+    nullable: true
 """
 
 _OTHER_SCHEMA_YAML = """\
 name: other_schema
 description: Another schema
 columns:
-  - name: code
+  code:
     type: str
-    required: true
+    nullable: false
 """
 
 

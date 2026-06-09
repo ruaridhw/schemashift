@@ -5,13 +5,11 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from schemashift.readers import read_header
-
-if TYPE_CHECKING:
-    from schemashift.target_schema import TargetSchema
-
 import click
 import polars as pl
+
+if TYPE_CHECKING:
+    from schemashift.validation import SchemaConfig
 
 from schemashift.errors import (
     AmbiguousFormatError,
@@ -20,8 +18,9 @@ from schemashift.errors import (
     ReviewRejectedError,
 )
 from schemashift.llm import generate_config, load_default_llm
-from schemashift.models import FormatConfig
+from schemashift.models import TransformSpec
 from schemashift.orchestration import _detect_config
+from schemashift.readers import read_header
 from schemashift.registry import FileSystemRegistry
 from schemashift.transform import _transform, validate_config
 
@@ -124,7 +123,7 @@ def generate(
     interactive: bool,
     prompt: str | None,
 ) -> None:
-    """Generate a FormatConfig for an unknown file using an LLM.
+    """Generate a TransformSpec for an unknown file using an LLM.
 
     Requires ANTHROPIC_API_KEY (direct) or FOUNDRY_API_KEY + FOUNDRY_RESOURCE
     (Azure AI Foundry) to be set in the environment.
@@ -180,8 +179,8 @@ def generate(
 @cli.command()
 @click.option("--output", "-o", default=None, help="Write schema to FILE instead of stdout.")
 def schema(output: str | None) -> None:
-    """Print the JSON Schema for FormatConfig."""
-    data = {"$schema": "http://json-schema.org/draft-07/schema#", **FormatConfig.model_json_schema()}
+    """Print the JSON Schema for TransformSpec."""
+    data = {"$schema": "http://json-schema.org/draft-07/schema#", **TransformSpec.model_json_schema()}
     text = json.dumps(data, indent=2, sort_keys=True)
     if output is not None:
         Path(output).write_text(text, encoding="utf-8")
@@ -212,18 +211,18 @@ def list_configs(registry: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -> "TargetSchema":
-    """Resolve a TargetSchema from an explicit path or a registry schemas/ dir.
+def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -> "SchemaConfig":
+    """Resolve a SchemaConfig from an explicit path or a registry schemas/ dir.
 
     Resolution order:
     1. If *target_schema_path* is given, load it directly.
     2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_schema`.
     3. Otherwise raise :class:`click.UsageError`.
     """
-    from schemashift.target_schema import TargetSchema  # noqa: PLC0415
+    from schemashift.validation import SchemaConfig  # noqa: PLC0415
 
     if target_schema_path is not None:
-        return TargetSchema.from_yaml(Path(target_schema_path))
+        return SchemaConfig.from_yaml(Path(target_schema_path))
 
     if registry_path is not None:
         try:
@@ -243,10 +242,10 @@ def _load_default_llm() -> Any:
         raise click.ClickException(str(exc)) from exc
 
 
-def _load_format_config(path: Path) -> FormatConfig:
-    """Load a FormatConfig from a JSON file."""
+def _load_format_config(path: Path) -> TransformSpec:
+    """Load a TransformSpec from a JSON file."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    return FormatConfig.model_validate(data)
+    return TransformSpec.model_validate(data)
 
 
 def _sink_output(lf: pl.LazyFrame, output: str) -> None:

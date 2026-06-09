@@ -1,5 +1,7 @@
 """Pydantic v2 models for schemashift configuration."""
 
+from __future__ import annotations
+
 import json
 from typing import Any
 
@@ -8,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 from .dsl import collect_col_refs
 from .dtypes import DTYPE_MAP, DType
 from .errors import ConfigValidationError
+from .validation import SchemaConfig  # noqa: TC001  # runtime import needed for Pydantic field resolution
 
 # Sentinel for optional Any-typed fields where None is a valid user-supplied value.
 # Using PydanticUndefined as a default makes Pydantic treat the field as required,
@@ -70,7 +73,7 @@ class ColumnMapping(BaseModel):
         return json.dumps(self.model_dump(**kwargs))
 
     @model_validator(mode="after")
-    def _exactly_one_source_set(self) -> "ColumnMapping":
+    def _exactly_one_source_set(self) -> ColumnMapping:
         set_fields = sum(
             [
                 self.source is not None,
@@ -99,15 +102,17 @@ class ReaderConfig(BaseModel):
     encoding: str = Field(default="utf-8", description="Character encoding of the source file.")
 
 
-class FormatConfig(BaseModel):
-    """Top-level configuration for a single source format."""
+class TransformSpec(BaseModel):
+    """Top-level specification for a declarative transformation pipeline."""
 
     model_config = {"from_attributes": True}
 
-    name: str = Field(description="Unique identifier for this format configuration.")
-    description: str = Field(default="", description="Human-readable description of this format.")
-    version: int = Field(default=1, description="Config version. Increment on breaking changes.", ge=1)
-    target_schema: str | None = Field(default=None, description="Name of the TargetSchema to validate against.")
+    name: str = Field(description="Unique identifier for this transform specification.")
+    description: str = Field(default="", description="Human-readable description of this transform.")
+    version: int = Field(default=1, description="Spec version. Increment on breaking changes.", ge=1)
+    output_schema: SchemaConfig | None = Field(
+        default=None, description="Output schema for validation via dataframely."
+    )
     reader: ReaderConfig = Field(default_factory=ReaderConfig, description="Low-level reader options.")
     columns: list[ColumnMapping] = Field(description="Ordered list of column mappings defining the output schema.")
     drop_unmapped: bool = Field(default=True, description="Drop source columns not referenced by any mapping.")
@@ -125,7 +130,7 @@ class FormatConfig(BaseModel):
         return json.dumps(self.model_dump(**kwargs), indent=indent)
 
     @model_validator(mode="after")
-    def _unique_target_names(self) -> "FormatConfig":
+    def _unique_target_names(self) -> TransformSpec:
         targets = [col.target for col in self.columns]
         seen: set[str] = set()
         duplicates: list[str] = []
@@ -135,7 +140,7 @@ class FormatConfig(BaseModel):
             seen.add(t)
         if duplicates:
             raise ConfigValidationError(
-                f"FormatConfig '{self.name}': duplicate target column names: {sorted(set(duplicates))}"
+                f"TransformSpec '{self.name}': duplicate target column names: {sorted(set(duplicates))}"
             )
         return self
 

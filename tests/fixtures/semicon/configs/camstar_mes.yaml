@@ -4,7 +4,6 @@ description: >
   use naive local-time strings; a few use ISO 8601 with +00:00 or +09:00 offsets.
   CARRIER_ID is a distractor column. HOLD_STATUS is NONE/QUALITY/ENGINEERING.
 version: 1
-target_schema: lot_movement
 reader:
   skip_rows: 0
   separator: ","

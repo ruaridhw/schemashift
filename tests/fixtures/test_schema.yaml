@@ -1,19 +1,19 @@
 name: test_schema
 description: Schema used in unit tests
 columns:
-  - name: id
+  id:
     type: int64
-    required: true
+    nullable: false
     description: Unique row identifier
-  - name: name
+  name:
     type: str
-    required: true
+    nullable: false
     description: Full name
-  - name: amount
+  amount:
     type: float64
-    required: false
+    nullable: true
     description: Transaction amount
-  - name: category
+  category:
     type: str
-    required: false
+    nullable: true
     description: Expense category

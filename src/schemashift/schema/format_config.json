@@ -1,5 +1,139 @@
 {
   "$defs": {
+    "ColumnConstraints": {
+      "description": "Per-column schema definition mapping to a dataframely column type + constraints.",
+      "properties": {
+        "description": {
+          "default": "",
+          "description": "Human-readable description.",
+          "title": "Description",
+          "type": "string"
+        },
+        "is_in": {
+          "anyOf": [
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Allowed values (integers only natively; strings use check).",
+          "title": "Is In"
+        },
+        "max": {
+          "default": null,
+          "description": "Maximum value (inclusive).",
+          "title": "Max"
+        },
+        "max_exclusive": {
+          "default": null,
+          "description": "Maximum value (exclusive).",
+          "title": "Max Exclusive"
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum string length.",
+          "title": "Max Length"
+        },
+        "min": {
+          "default": null,
+          "description": "Minimum value (inclusive).",
+          "title": "Min"
+        },
+        "min_exclusive": {
+          "default": null,
+          "description": "Minimum value (exclusive).",
+          "title": "Min Exclusive"
+        },
+        "min_length": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum string length.",
+          "title": "Min Length"
+        },
+        "nullable": {
+          "default": false,
+          "description": "Whether null values are allowed.",
+          "title": "Nullable",
+          "type": "boolean"
+        },
+        "primary_key": {
+          "default": false,
+          "description": "Whether this column is a primary key.",
+          "title": "Primary Key",
+          "type": "boolean"
+        },
+        "regex": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Regex pattern the string must match.",
+          "title": "Regex"
+        },
+        "type": {
+          "description": "Polars dtype string (e.g. 'int64', 'str', 'float64').",
+          "enum": [
+            "str",
+            "string",
+            "utf8",
+            "int8",
+            "int16",
+            "int32",
+            "int64",
+            "integer",
+            "uint8",
+            "uint16",
+            "uint32",
+            "uint64",
+            "float32",
+            "float64",
+            "number",
+            "bool",
+            "boolean",
+            "date",
+            "datetime",
+            "time",
+            "duration",
+            "binary",
+            "categorical",
+            "null"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ColumnConstraints",
+      "type": "object"
+    },
     "ColumnMapping": {
       "description": "Describes how to produce one output column.",
       "properties": {
@@ -136,10 +270,40 @@
       },
       "title": "ReaderConfig",
       "type": "object"
+    },
+    "SchemaConfig": {
+      "description": "Declarative schema definition loadable from YAML/JSON.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ColumnConstraints"
+          },
+          "description": "Column name \u2192 constraints mapping.",
+          "title": "Columns",
+          "type": "object"
+        },
+        "description": {
+          "default": "",
+          "description": "Human-readable description.",
+          "title": "Description",
+          "type": "string"
+        },
+        "name": {
+          "description": "Schema identifier.",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "columns"
+      ],
+      "title": "SchemaConfig",
+      "type": "object"
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "description": "Top-level configuration for a single source format.",
+  "description": "Top-level specification for a declarative transformation pipeline.",
   "properties": {
     "columns": {
       "description": "Ordered list of column mappings defining the output schema.",
@@ -151,7 +315,7 @@
     },
     "description": {
       "default": "",
-      "description": "Human-readable description of this format.",
+      "description": "Human-readable description of this transform.",
       "title": "Description",
       "type": "string"
     },
@@ -162,30 +326,29 @@
       "type": "boolean"
     },
     "name": {
-      "description": "Unique identifier for this format configuration.",
+      "description": "Unique identifier for this transform specification.",
       "title": "Name",
       "type": "string"
     },
-    "reader": {
-      "$ref": "#/$defs/ReaderConfig",
-      "description": "Low-level reader options."
-    },
-    "target_schema": {
+    "output_schema": {
       "anyOf": [
         {
-          "type": "string"
+          "$ref": "#/$defs/SchemaConfig"
         },
         {
           "type": "null"
         }
       ],
       "default": null,
-      "description": "Name of the TargetSchema to validate against.",
-      "title": "Target Schema"
+      "description": "Output schema for validation via dataframely."
+    },
+    "reader": {
+      "$ref": "#/$defs/ReaderConfig",
+      "description": "Low-level reader options."
     },
     "version": {
       "default": 1,
-      "description": "Config version. Increment on breaking changes.",
+      "description": "Spec version. Increment on breaking changes.",
       "minimum": 1,
       "title": "Version",
       "type": "integer"
@@ -195,6 +358,6 @@
     "name",
     "columns"
   ],
-  "title": "FormatConfig",
+  "title": "TransformSpec",
   "type": "object"
 }

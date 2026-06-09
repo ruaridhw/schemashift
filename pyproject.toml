@@ -21,6 +21,7 @@ dependencies = [
     "click>=8.3,<9",
     "fastexcel>=0.19,<1",
     "lark>=1.2,<2",
+    "dataframely>=2.8,<3",
 ]
 
 [project.optional-dependencies]

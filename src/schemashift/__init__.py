@@ -15,32 +15,36 @@ from schemashift.errors import (
     UnsupportedFileError,
 )
 from schemashift.llm import load_default_llm
-from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
+from schemashift.models import ColumnMapping, ReaderConfig, TransformSpec
 from schemashift.orchestration import smart_transform
 from schemashift.readers import read_file
 from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
+from schemashift.result import FailureInfo, TransformResult
 from schemashift.schema import get_schema, get_schema_path
-from schemashift.target_schema import TargetSchema
 from schemashift.transform import transform, validate_config
+from schemashift.validation import ColumnConstraints, SchemaConfig
 
 __all__ = [
     "AmbiguousFormatError",
+    "ColumnConstraints",
     "ColumnMapping",
     "ConfigValidationError",
     "DSLRuntimeError",
     "DSLSyntaxError",
     "DictRegistry",
+    "FailureInfo",
     "FileSystemRegistry",
-    "FormatConfig",
     "FormatDetectionError",
     "LLMGenerationError",
     "ReaderConfig",
     "ReaderError",
     "Registry",
     "ReviewRejectedError",
+    "SchemaConfig",
     "SchemaShiftError",
     "SchemaValidationError",
-    "TargetSchema",
+    "TransformResult",
+    "TransformSpec",
     "UnsupportedFileError",
     "detect_format",
     "get_schema",

@@ -4,7 +4,7 @@ import pytest
 
 from schemashift.detection import detect_format
 from schemashift.errors import AmbiguousFormatError
-from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.registry import DictRegistry
 
 # ---------------------------------------------------------------------------
@@ -12,16 +12,16 @@ from schemashift.registry import DictRegistry
 # ---------------------------------------------------------------------------
 
 
-def _make_config(name: str, source_cols: list[str]) -> FormatConfig:
-    """Build a FormatConfig that references the given source column names."""
+def _make_config(name: str, source_cols: list[str]) -> TransformSpec:
+    """Build a TransformSpec that references the given source column names."""
     columns = [ColumnMapping(target=f"out_{c}", source=c) for c in source_cols]
-    return FormatConfig(name=name, columns=columns)
+    return TransformSpec(name=name, columns=columns)
 
 
-def _make_expr_config(name: str, expr_cols: list[str]) -> FormatConfig:
-    """Build a FormatConfig that references columns via DSL expr."""
+def _make_expr_config(name: str, expr_cols: list[str]) -> TransformSpec:
+    """Build a TransformSpec that references columns via DSL expr."""
     columns = [ColumnMapping(target="result", expr=" + ".join(f'col("{c}")' for c in expr_cols))]
-    return FormatConfig(name=name, columns=columns)
+    return TransformSpec(name=name, columns=columns)
 
 
 # ---------------------------------------------------------------------------

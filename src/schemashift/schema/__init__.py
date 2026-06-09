@@ -1,4 +1,4 @@
-"""Accessors for the bundled JSON Schema for FormatConfig."""
+"""Accessors for the bundled JSON Schema for TransformSpec."""
 
 import importlib.resources as ilr
 import json
@@ -11,5 +11,5 @@ def get_schema_path() -> Path:
 
 
 def get_schema() -> dict:
-    """Return the bundled JSON Schema for FormatConfig (includes $schema key)."""
+    """Return the bundled JSON Schema for TransformSpec (includes $schema key)."""
     return json.loads(get_schema_path().read_text(encoding="utf-8"))
