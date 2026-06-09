@@ -2,17 +2,17 @@
 
 ## Context
 
-schemashift's current validation (`TargetSchema`) provides only column-level feedback: missing columns, dtype mismatches, and aggregate null counts. When a transform config produces bad data, users cannot see *which rows* broke or *why* without manual debugging. The goal is to integrate [dataframely](https://github.com/Quantco/dataframely) (`dy`) to get rich, row-level validation details for every failure — schema constraint violations and transform-induced errors alike — returned all at once in a single result object.
+schemashift's current validation (`DatasetSchema`) provides only column-level feedback: missing columns, dtype mismatches, and aggregate null counts. When a transform config produces bad data, users cannot see *which rows* broke or *why* without manual debugging. The goal is to integrate [dataframely](https://github.com/Quantco/dataframely) (`dy`) to get rich, row-level validation details for every failure — schema constraint violations and transform-induced errors alike — returned all at once in a single result object.
 
 This is a breaking change. No migration path or backwards compatibility is needed.
 
 ## Design
 
-### 1. SchemaConfig (replaces TargetSchema)
+### 1. DatasetSchema (replaces DatasetSchema)
 
 **New file: `src/schemashift/schema.py`**
 
-`SchemaConfig` is a Pydantic model loadable from YAML/JSON that maps to dataframely column types and their constraints. It replaces both `TargetSchema` and `TargetColumn`.
+`DatasetSchema` is a Pydantic model loadable from YAML/JSON that maps to dataframely column types and their constraints. It replaces both `DatasetSchema` and `TargetColumn`.
 
 ```yaml
 # Example schema.yaml
@@ -45,11 +45,11 @@ columns:
 **Pydantic models:**
 
 - `ColumnConstraints` — per-column config with fields: `type` (DType, required), `nullable` (bool, default False), `primary_key` (bool, default False), `min`, `max`, `min_exclusive`, `max_exclusive`, `min_length`, `max_length`, `regex`, `is_in`, `description`.
-- `SchemaConfig` — top-level with `name`, `description`, `columns: dict[str, ColumnConstraints]`.
+- `DatasetSchema` — top-level with `name`, `description`, `columns: dict[str, ColumnConstraints]`.
 
 **Factory function:**
 
-`build_dy_schema(config: SchemaConfig) -> type[dy.Schema]` dynamically constructs a `dy.Schema` subclass using `type()` metaclass construction. Maps each column entry to the corresponding `dy.Int64(...)`, `dy.String(min_length=..., ...)`, etc.
+`build_dy_schema(config: DatasetSchema) -> type[dy.Schema]` dynamically constructs a `dy.Schema` subclass using `type()` metaclass construction. Maps each column entry to the corresponding `dy.Int64(...)`, `dy.String(min_length=..., ...)`, etc.
 
 **Type mapping:** `DType` string (e.g., `"int64"`) maps to both a Polars dtype and a dy column class. New lookup table in `schema.py`:
 
@@ -65,20 +65,20 @@ DY_COLUMN_MAP: dict[str, type[dy.Column]] = {
 }
 ```
 
-**Escape hatch:** Users who need custom `@dy.rule()` methods write a `dy.Schema` class directly and pass it in. The API accepts `SchemaConfig | type[dy.Schema]` anywhere a schema is needed. `resolve_schema()` normalises both to `type[dy.Schema]`.
+**Escape hatch:** Users who need custom `@dy.rule()` methods write a `dy.Schema` class directly and pass it in. The API accepts `DatasetSchema | type[dy.Schema]` anywhere a schema is needed. `resolve_dataset_schema()` normalises both to `type[dy.Schema]`.
 
-### 2. TransformSpec (replaces FormatConfig)
+### 2. TransformSpec (replaces TransformSpec)
 
 **File: `src/schemashift/models.py`**
 
-`FormatConfig` is renamed to `TransformSpec`. The `target_schema: str | None` field is replaced with a required `schema: SchemaConfig` field.
+`TransformSpec` is renamed to `TransformSpec`. The `dataset_schema: str | None` field is replaced with a required `schema: DatasetSchema` field.
 
 ```python
 class TransformSpec(BaseModel):
     name: str
     description: str = ""
     version: int = 1
-    schema: SchemaConfig                    # Required, replaces target_schema
+    schema: DatasetSchema                    # Required, replaces dataset_schema
     reader: ReaderConfig = ReaderConfig()
     columns: list[ColumnMapping]
     drop_unmapped: bool = True
@@ -165,7 +165,7 @@ class TransformResult:
 def transform(
     path: Path,
     config: TransformSpec,
-    schema: SchemaConfig | type[dy.Schema] | None = None,  # Override config.schema
+    schema: DatasetSchema | type[dy.Schema] | None = None,  # Override config.schema
     *,
     strict: bool = False,
     n_rows: int | None = None,
@@ -184,7 +184,7 @@ def transform(
      try: build expression (lenient casts: strict=False)
      except: record in expression_errors, produce null column
 3. Apply expressions → .collect() → DataFrame
-4. Resolve schema: SchemaConfig → build_dy_schema() or use dy.Schema directly
+4. Resolve schema: DatasetSchema → build_dy_schema() or use dy.Schema directly
 5. dy_schema.filter(df) → (valid_df, dy.FailureInfo)
 6. Build FailureInfo(schema_failures=dy_failures, expression_errors=errors)
 7. Return TransformResult(valid=valid_df, failures=failure_info)
@@ -225,7 +225,7 @@ SchemaShiftError
 def smart_transform(
     path: Path,
     registry: Registry,
-    schema: SchemaConfig | type[dy.Schema] | None = None,
+    schema: DatasetSchema | type[dy.Schema] | None = None,
     *,
     strict: bool = False,
     # ... same LLM/review params ...
@@ -236,15 +236,15 @@ def smart_transform(
 
 | File | Action |
 |---|---|
-| `src/schemashift/schema.py` | NEW — SchemaConfig, ColumnConstraints, build_dy_schema(), resolve_schema() |
+| `src/schemashift/schema.py` | NEW — DatasetSchema, ColumnConstraints, build_dy_schema(), resolve_dataset_schema() |
 | `src/schemashift/result.py` | NEW — TransformResult, FailureInfo |
-| `src/schemashift/models.py` | MODIFY — rename FormatConfig → TransformSpec, replace target_schema with schema: SchemaConfig |
+| `src/schemashift/models.py` | MODIFY — rename TransformSpec → TransformSpec, replace dataset_schema with schema: DatasetSchema |
 | `src/schemashift/transform.py` | MODIFY — return TransformResult, lenient casts, dy.Schema.filter() integration |
 | `src/schemashift/orchestration.py` | MODIFY — return TransformResult, remove validate_lazy/validate_eager calls |
 | `src/schemashift/errors.py` | MODIFY — SchemaValidationError gains .failures |
-| `src/schemashift/target_schema.py` | REMOVE |
+| `src/schemashift/dataset_schema.py` | REMOVE |
 | `src/schemashift/dtypes.py` | MODIFY — add DY_COLUMN_MAP or move to schema.py |
-| `src/schemashift/llm.py` | MODIFY — update to use TransformSpec and SchemaConfig |
+| `src/schemashift/llm.py` | MODIFY — update to use TransformSpec and DatasetSchema |
 | `src/schemashift/detection.py` | MODIFY — update to use TransformSpec |
 | `src/schemashift/registry.py` | MODIFY — update to use TransformSpec |
 | `pyproject.toml` | MODIFY — add `dataframely` dependency |
@@ -258,7 +258,7 @@ Future consideration: DSL could be extended to express validation predicates (co
 
 ## Verification
 
-1. **Unit tests:** SchemaConfig round-trips through YAML → Pydantic → dy.Schema. Constraints (min, max, regex, is_in, nullable) map correctly.
+1. **Unit tests:** DatasetSchema round-trips through YAML → Pydantic → dy.Schema. Constraints (min, max, regex, is_in, nullable) map correctly.
 2. **Transform tests:** A TransformSpec with intentional partial failures (bad casts, out-of-range values) returns TransformResult with correct valid/invalid row split and meaningful FailureInfo.
 3. **Strict mode:** `strict=True` raises SchemaValidationError with FailureInfo attached.
 4. **Expression error capture:** A TransformSpec referencing a nonexistent column produces TransformResult with expression_errors populated (not a raised exception).

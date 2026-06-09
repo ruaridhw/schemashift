@@ -1,6 +1,6 @@
 # Config format reference
 
-A `FormatConfig` is a JSON (or YAML) file that describes how to transform one specific source format into your target schema.
+A `TransformSpec` is a JSON (or YAML) file that describes how to transform one specific source format into your dataset schema.
 
 ## Full structure
 
@@ -9,7 +9,6 @@ A `FormatConfig` is a JSON (or YAML) file that describes how to transform one sp
   "name": "camstar_mes",
   "description": "Camstar MES lot movement export",
   "version": 1,
-  "target_schema": "lot_movement",
   "reader": {
     "skip_rows": 0,
     "separator": ",",
@@ -37,8 +36,8 @@ A `FormatConfig` is a JSON (or YAML) file that describes how to transform one sp
 `version`
 : Integer version number. Defaults to `1`.
 
-`target_schema`
-: Name of the `TargetSchema` this config produces. Used for validation.
+`dataset_schema`
+: Optional inline `DatasetSchema` object. Most workflows keep dataset schemas in YAML files and pass them at runtime with `dataset_schema=...`.
 
 `reader`
 : Optional `ReaderConfig` controlling how the file is read. See [Reader options](#reader-options).
@@ -119,7 +118,7 @@ Use `validate_config()` to check that all DSL expressions parse correctly withou
 ```python
 import schemashift as ss
 
-config = ss.FormatConfig.model_validate_json(open("my_config.json").read())
+config = ss.TransformSpec.model_validate_json(open("my_config.json").read())
 errors = ss.validate_config(config)
 if errors:
     for err in errors:

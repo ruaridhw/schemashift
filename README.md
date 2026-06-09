@@ -2,7 +2,7 @@
 
 Declarative file format transformer — config-driven column mappings with a safe expression DSL.
 
-Transform tabular files (CSV, XLSX, Parquet, JSON, TSV) into a canonical schema using a single JSON config per source format. When encountering an unknown format, an LLM generates the config automatically.
+Transform tabular files (CSV, XLSX, Parquet, JSON, TSV) into a validated dataset using a single JSON config per source format. When encountering an unknown format, an LLM generates the config automatically.
 
 ## Installation
 
@@ -16,27 +16,27 @@ pip install "schemashift[llm]"
 
 ## Quick start
 
-### 1. Define a target schema
+### 1. Define a dataset schema
 
 ```yaml
 # schemas/certificates.yaml
 name: canonical_certificate
 columns:
-  - name: certificate_id
+  certificate_id:
     type: str
-    required: true
-  - name: volume_mwh
+    nullable: false
+  volume_mwh:
     type: float64
-    required: true
-  - name: issue_date
+    nullable: false
+  issue_date:
     type: datetime
-    required: true
-  - name: technology
+    nullable: false
+  technology:
     type: str
-    required: true
-  - name: data_source
+    nullable: false
+  data_source:
     type: str
-    required: true
+    nullable: false
 ```
 
 ### 2. Write a config for a known source format
@@ -60,8 +60,9 @@ columns:
 import schemashift as ss
 
 registry = ss.FileSystemRegistry("./configs/")
-df = ss.transform("data.csv", registry.get("provider_x_certificates"))
-# returns a polars.DataFrame
+schema = ss.DatasetSchema.from_yaml("schemas/certificates.yaml")
+result = ss.transform("data.csv", registry.get("provider_x_certificates"), dataset_schema=schema)
+# result.valid is a polars.DataFrame; result.failures contains validation details
 ```
 
 ## LLM-assisted config generation
@@ -71,7 +72,7 @@ When a file arrives from a new source with no matching config, `smart_transform`
 ```python
 import schemashift as ss
 
-schema = ss.TargetSchema.from_yaml("schemas/certificates.yaml")
+schema = ss.DatasetSchema.from_yaml("schemas/certificates.yaml")
 registry = ss.FileSystemRegistry("./configs/")
 
 # bring your own LangChain-compatible LLM:
@@ -88,7 +89,7 @@ llm = ChatAnthropic(
 result = ss.smart_transform(
     "unknown_source.csv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     auto_register=True,   # saves the generated config for next time
 )
@@ -118,7 +119,7 @@ schemashift transform data.csv --registry ./configs/ --output result.csv
 schemashift validate provider_x.json
 
 # Generate a config for an unknown file (requires LLM credentials — see below)
-schemashift generate data.csv --target-schema schemas/certificates.yaml --output new_config.json
+schemashift generate data.csv --dataset-schema schemas/certificates.yaml --output new_config.json
 
 # Generate with interactive review before saving
 schemashift generate data.csv --registry ./configs/ --interactive
@@ -178,7 +179,6 @@ No `eval()`, no arbitrary Python — only the explicitly allowlisted operations 
   "name": "my_format",
   "description": "Optional description",
   "version": 1,
-  "target_schema": "canonical_certificate",
   "reader": {
     "skip_rows": 0,
     "sheet_name": "Sheet1",
@@ -194,7 +194,7 @@ No `eval()`, no arbitrary Python — only the explicitly allowlisted operations 
 }
 ```
 
-Each column mapping requires exactly one of `source`, `expr`, or `constant`. The `dtype` field casts the result; `fillna` fills nulls after the mapping is applied.
+Each column mapping requires exactly one of `source`, `expr`, or `constant`. The `dtype` field casts the result; `fillna` fills nulls after the mapping is applied. Pass a `DatasetSchema` at runtime with `dataset_schema=...`, or embed a `dataset_schema` object in the `TransformSpec` when a config should carry its validation contract with it.
 
 ## Supported file formats
 

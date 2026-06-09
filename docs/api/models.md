@@ -1,7 +1,7 @@
 # Config models
 
 ```{eval-rst}
-.. autoclass:: schemashift.FormatConfig
+.. autoclass:: schemashift.TransformSpec
    :members:
 ```
 
@@ -16,6 +16,6 @@
 ```
 
 ```{eval-rst}
-.. autoclass:: schemashift.TargetSchema
+.. autoclass:: schemashift.DatasetSchema
    :members:
 ```

@@ -12,7 +12,7 @@ schemashift transform <FILE> [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--config PATH` | Path to a `FormatConfig` JSON file |
+| `--config PATH` | Path to a `TransformSpec` JSON file |
 | `--registry DIR` | Path to a registry directory (auto-detect format) |
 | `--output PATH` | Output file path (CSV, Parquet, or JSON by extension). Prints first 20 rows to stdout if omitted. |
 
@@ -43,7 +43,7 @@ schemashift validate camstar_mes.json
 
 ## generate
 
-Generate a `FormatConfig` for an unknown file using an LLM.
+Generate a `TransformSpec` for an unknown file using an LLM.
 
 Requires `pip install "schemashift[llm]"` and LLM credentials in the environment (or a `.env` file).
 
@@ -53,7 +53,7 @@ schemashift generate <FILE> [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--target-schema PATH` | YAML `TargetSchema` to generate a config for (required) |
+| `--dataset-schema PATH` | YAML `DatasetSchema` to generate a config for (required) |
 | `--registry DIR` | Save the generated config here |
 | `--output PATH` | Save the generated config to this specific path |
 | `--interactive` | Review the config before saving |
@@ -61,17 +61,17 @@ schemashift generate <FILE> [OPTIONS]
 
 ```bash
 # Generate and print
-schemashift generate sap_erp.csv --target-schema schemas/lot_movement.yaml
+schemashift generate sap_erp.csv --dataset-schema schemas/lot_movement.yaml
 
 # Generate and save to registry
 schemashift generate sap_erp.csv \
     --registry ./configs/ \
-    --target-schema schemas/lot_movement.yaml
+    --dataset-schema schemas/lot_movement.yaml
 
 # Generate with review step
 schemashift generate sap_erp.csv \
     --registry ./configs/ \
-    --target-schema schemas/lot_movement.yaml \
+    --dataset-schema schemas/lot_movement.yaml \
     --interactive
 ```
 

@@ -17,7 +17,7 @@ around three goals:
    configs is straightforward, thereby saving time and tokens when an almost-familiar format reappears.
 
 When a new format arrives with no matching config, `smart_transform()` sends the file headers and your
-target schema to your LLM, validates the generated config end-to-end, and saves it to the registry
+dataset schema to your LLM, validates the generated config end-to-end, and saves it to the registry
 so the next run is instant.
 
 ---
@@ -33,24 +33,24 @@ In the future `type` may also be various `Enum`s that you define or other custom
 # schemas/lot_movement.yaml
 name: lot_movement
 columns:
-  - name: lot_id
+  lot_id:
     type: str
-    required: true
-  - name: wafer_count
+    nullable: false
+  wafer_count:
     type: int32
-    required: true
-  - name: operation
+    nullable: false
+  operation:
     type: str
-    required: true
-  - name: track_in_time
+    nullable: false
+  track_in_time:
     type: datetime
-    required: true
-  - name: hold_flag
+    nullable: false
+  hold_flag:
     type: bool
-    required: true
-  - name: data_source
+    nullable: false
+  data_source:
     type: str
-    required: true
+    nullable: false
 ```
 
 **2. Write a config for one source format:**
@@ -79,7 +79,8 @@ The point is that JSON configs are simple enough for an LLM to infer, write, and
 import schemashift as ss
 
 registry = ss.FileSystemRegistry("./configs/")
-df = ss.smart_transform("camstar_mes.csv", registry=registry)
+schema = ss.DatasetSchema.from_yaml("schemas/lot_movement.yaml")
+result = ss.smart_transform("camstar_mes.csv", registry=registry, dataset_schema=schema)
 ```
 
 ## When a new format arrives
@@ -90,13 +91,13 @@ Otherwise, if an LLM is provided, it will be used to generate the transformation
 ```python
 from langchain_anthropic import ChatAnthropic
 
-schema = ss.TargetSchema.from_yaml("schemas/lot_movement.yaml")
+schema = ss.DatasetSchema.from_yaml("schemas/lot_movement.yaml")
 llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
-df = ss.smart_transform(
+result = ss.smart_transform(
     "fabx.tsv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     auto_register=True,   # saves the config so next run hits the registry
 )
@@ -111,7 +112,7 @@ df = ss.smart_transform(
 :link-type: doc
 
 Register a config once per source. Call `transform()` to apply it — returns a
-`polars.DataFrame`. Pass `n_rows=N` to preview without reading the full file.
+`TransformResult` with valid rows and failure details. Pass `n_rows=N` to preview without reading the full file.
 :::
 
 :::{grid-item-card} Auto-detect from a registry
@@ -126,7 +127,7 @@ and picks the right config — or raises `AmbiguousFormatError` when the match i
 :link: user-guide/llm-generation
 :link-type: doc
 
-Unknown format? `smart_transform()` sends the file headers and target schema to your LLM, validates
+Unknown format? `smart_transform()` sends the file headers and dataset schema to your LLM, validates
 the generated config end-to-end, and optionally saves it to the registry for next time.
 :::
 

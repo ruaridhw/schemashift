@@ -5,8 +5,8 @@ When a file arrives from a source you have no config for, `smart_transform()` ca
 ## How it works
 
 1. schemashift reads the file headers and a small sample (default 5 rows)
-2. Sends them to your LLM along with the target schema and the DSL reference
-3. The LLM returns a `FormatConfig` as JSON
+2. Sends them to your LLM along with the dataset schema and the DSL reference
+3. The LLM returns a `TransformSpec` as JSON
 4. schemashift validates the config: parses all DSL expressions, transforms the sample rows
 5. On failure, retries up to N times (default 2) with the error appended to the prompt
 6. On success, optionally saves the config to the registry
@@ -55,14 +55,14 @@ Or via environment variables (`FOUNDRY_API_KEY` + `FOUNDRY_RESOURCE`).
 import schemashift as ss
 from langchain_anthropic import ChatAnthropic
 
-schema = ss.TargetSchema.from_yaml("schemas/lot_movement.yaml")
+schema = ss.DatasetSchema.from_yaml("schemas/lot_movement.yaml")
 registry = ss.FileSystemRegistry("./configs/")
 llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
 result = ss.smart_transform(
     "sap_erp.csv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     auto_register=True,  # saves the config so next run hits the registry
 )
@@ -75,7 +75,7 @@ If the file matches an existing config in the registry, `smart_transform()` uses
 Pass a `review_fn` to inspect and optionally edit the generated config before it's applied:
 
 ```python
-def review(config: ss.FormatConfig, sample_df) -> ss.FormatConfig | None:
+def review(config: ss.TransformSpec, sample_df) -> ss.TransformSpec | None:
     print(config.model_dump_json(indent=2))
     print(sample_df)
     # return config to accept, return None to reject
@@ -84,7 +84,7 @@ def review(config: ss.FormatConfig, sample_df) -> ss.FormatConfig | None:
 result = ss.smart_transform(
     "sap_erp.csv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     review_fn=review,
     auto_register=True,
@@ -100,7 +100,7 @@ from schemashift.llm import generate_config
 
 config = generate_config(
     path="sap_erp.csv",
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     max_retries=3,
 )
@@ -126,17 +126,17 @@ except LLMGenerationError as e:
 
 ```bash
 # Generate a config and print it
-schemashift generate data.csv --target-schema schemas/lot_movement.yaml
+schemashift generate data.csv --dataset-schema schemas/lot_movement.yaml
 
 # Generate and save to the registry
 schemashift generate data.csv \
     --registry ./configs/ \
-    --target-schema schemas/lot_movement.yaml
+    --dataset-schema schemas/lot_movement.yaml
 
 # Generate with interactive review before saving
 schemashift generate data.csv \
     --registry ./configs/ \
-    --target-schema schemas/lot_movement.yaml \
+    --dataset-schema schemas/lot_movement.yaml \
     --interactive
 ```
 
