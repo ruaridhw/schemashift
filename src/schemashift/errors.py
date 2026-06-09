@@ -31,6 +31,10 @@ class FormatDetectionError(SchemaShiftError):
     """Raised when automatic format detection fails."""
 
 
+class ReviewRejectedError(SchemaShiftError):
+    """Raised when a review_fn callback rejects a generated config by returning None."""
+
+
 class AmbiguousFormatError(FormatDetectionError):
     """Raised when multiple formats match with equal confidence."""
 

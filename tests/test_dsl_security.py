@@ -8,7 +8,6 @@ import polars as pl
 import pytest
 
 from schemashift.dsl import parse_and_compile
-from schemashift.dsl.parser import parse_dsl
 from schemashift.errors import DSLSyntaxError
 
 # ---------------------------------------------------------------------------
@@ -19,43 +18,43 @@ from schemashift.errors import DSLSyntaxError
 class TestMethodAllowlist:
     def test_system_method_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").system("rm -rf /")')
+            parse_and_compile('col("x").system("rm -rf /")')
 
     def test_eval_method_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").eval("__import__(\'os\')")')
+            parse_and_compile('col("x").eval("__import__(\'os\')")')
 
     def test_exec_method_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").exec("import os")')
+            parse_and_compile('col("x").exec("import os")')
 
     def test_arbitrary_method_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").to_pandas()')
+            parse_and_compile('col("x").to_pandas()')
 
     def test_private_method_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x")._private()')
+            parse_and_compile('col("x")._private()')
 
     def test_dunder_method_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").__class__()')
+            parse_and_compile('col("x").__class__()')
 
     def test_unknown_str_submethod_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").str.format("pattern")')
+            parse_and_compile('col("x").str.format("pattern")')
 
     def test_unknown_dt_submethod_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").dt.tzinfo()')
+            parse_and_compile('col("x").dt.tzinfo()')
 
     def test_unknown_namespace_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").os.system("ls")')
+            parse_and_compile('col("x").os.system("ls")')
 
     def test_list_methods_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x").list.get(0)')
+            parse_and_compile('col("x").list.get(0)')
 
 
 # ---------------------------------------------------------------------------
@@ -66,37 +65,37 @@ class TestMethodAllowlist:
 class TestInjectionPrevention:
     def test_import_pattern_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('__import__("os")')
+            parse_and_compile('__import__("os")')
 
     def test_dunder_ident_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("__builtins__")
+            parse_and_compile("__builtins__")
 
     def test_open_builtin_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("open")
+            parse_and_compile("open")
 
     def test_exec_ident_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("exec")
+            parse_and_compile("exec")
 
     def test_eval_ident_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("eval")
+            parse_and_compile("eval")
 
     def test_semicolon_injection_rejected(self) -> None:
         """Semicolon is not a valid token."""
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x"); import os')
+            parse_and_compile('col("x"); import os')
 
     def test_backtick_injection_rejected(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("`ls`")
+            parse_and_compile("`ls`")
 
     def test_hash_injection_rejected(self) -> None:
         """Hash/comment character is not a valid token."""
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("x") # + col("y")')
+            parse_and_compile('col("x") # + col("y")')
 
 
 # ---------------------------------------------------------------------------
@@ -154,27 +153,36 @@ class TestRobustness:
 
     def test_garbage_string_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("$@#!")
+            parse_and_compile("$@#!")
 
     def test_sql_injection_like_string_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("'; DROP TABLE users; --")
+            parse_and_compile("'; DROP TABLE users; --")
 
     def test_python_code_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("import os; os.system('ls')")
+            parse_and_compile("import os; os.system('ls')")
 
     def test_only_operator_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl("+")
+            parse_and_compile("+")
 
     def test_only_comma_raises_dsl_syntax_error(self) -> None:
         with pytest.raises(DSLSyntaxError):
-            parse_dsl(",")
+            parse_and_compile(",")
 
     def test_unicode_identifier_raises_dsl_syntax_error(self) -> None:
+        """Unicode characters outside quoted strings are rejected by the tokenizer.
+
+        The IDENT regex ``[A-Za-z_][A-Za-z0-9_]*`` is ASCII-only, so any
+        non-ASCII character in a keyword or identifier position (e.g. a
+        Cyrillic homoglyph of a method name) hits the ``Unexpected character``
+        branch and raises :exc:`DSLSyntaxError` before it can reach the
+        allowlist check.  This means homoglyph/homograph attacks cannot bypass
+        the method allowlist.
+        """
         with pytest.raises(DSLSyntaxError):
-            parse_dsl('col("α"β")')
+            parse_and_compile('col("\u03b1"\u03b2")')
 
     def test_random_numbers_only_expression_parses(self) -> None:
         """A plain number literal is valid DSL."""
@@ -200,7 +208,7 @@ class TestRobustness:
         ]
         for inp in garbage_inputs:
             with pytest.raises(DSLSyntaxError):  # never a bare Exception or TypeError
-                parse_dsl(inp)
+                parse_and_compile(inp)
 
 
 # ---------------------------------------------------------------------------
@@ -211,9 +219,7 @@ class TestRobustness:
 class TestCastValidation:
     def test_invalid_cast_type_rejected(self) -> None:
         """Unknown cast target type raises DSLSyntaxError (caught during compile)."""
-        from schemashift.errors import DSLSyntaxError as DslSE
-
-        with pytest.raises(DslSE):
+        with pytest.raises(DSLSyntaxError):
             parse_and_compile('col("x").cast("pickle")')
 
     def test_valid_cast_types_accepted(self) -> None:
@@ -237,3 +243,18 @@ class TestCastValidation:
         for t in valid_types:
             result = parse_and_compile(f'col("x").cast("{t}")')
             assert isinstance(result, pl.Expr), f"Expected Expr for cast({t!r})"
+
+
+# ---------------------------------------------------------------------------
+# not keyword
+# ---------------------------------------------------------------------------
+
+
+class TestNotKeyword:
+    def test_not_produces_safe_expr(self) -> None:
+        result = parse_and_compile('not col("x").is_null()')
+        assert isinstance(result, pl.Expr)
+
+    def test_double_not_produces_safe_expr(self) -> None:
+        result = parse_and_compile('not not col("x").is_null()')
+        assert isinstance(result, pl.Expr)

@@ -10,6 +10,7 @@ from schemashift.errors import (
     FormatDetectionError,
     LLMGenerationError,
     ReaderError,
+    ReviewRejectedError,
     SchemaShiftError,
     SchemaValidationError,
     UnsupportedFileError,
@@ -116,3 +117,15 @@ class TestSimpleErrors:
     def test_raises_and_message(self, error_cls):
         with pytest.raises(SchemaShiftError, match="test message"):
             raise error_cls("test message")
+
+
+class TestReviewRejectedError:
+    def test_is_schemashift_error(self):
+        assert issubclass(ReviewRejectedError, SchemaShiftError)
+
+    def test_not_format_detection_error(self):
+        assert not issubclass(ReviewRejectedError, FormatDetectionError)
+
+    def test_raises_with_message(self):
+        with pytest.raises(ReviewRejectedError, match="rejected"):
+            raise ReviewRejectedError("config was rejected")

@@ -2,7 +2,7 @@
 
 import pytest
 
-from schemashift.dsl.parser import parse_dsl
+from schemashift.dsl import parse_and_compile
 from schemashift.errors import DSLSyntaxError
 
 FUZZ_INPUTS = [
@@ -85,7 +85,7 @@ FUZZ_INPUTS = [
 def test_fuzz_input_never_crashes(expression: str) -> None:
     """Parser must raise DSLSyntaxError or return AST — never raise other exceptions."""
     try:
-        parse_dsl(expression)
+        parse_and_compile(expression)
     except DSLSyntaxError:
         pass  # Expected
     except Exception as exc:

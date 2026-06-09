@@ -1,6 +1,8 @@
 """File readers that return Polars LazyFrames."""
 
+import codecs
 from pathlib import Path
+from typing import Any
 
 import polars as pl
 
@@ -10,7 +12,7 @@ from .models import ReaderConfig
 _EXCEL_EXTENSIONS: frozenset[str] = frozenset({".xlsx", ".xls"})
 
 
-def read_file(path: str | Path, config: ReaderConfig | None = None) -> pl.LazyFrame:
+def read_file(path: Path, config: ReaderConfig | None = None) -> pl.LazyFrame:
     """Read a file into a LazyFrame based on its extension.
 
     Supported extensions: .csv, .tsv, .xlsx, .xls, .parquet, .json
@@ -50,7 +52,7 @@ def read_file(path: str | Path, config: ReaderConfig | None = None) -> pl.LazyFr
         raise ReaderError(f"Failed to read file '{path}': {exc}") from exc
 
 
-def read_header(path: str | Path, config: ReaderConfig | None = None) -> list[str]:
+def read_header(path: Path, config: ReaderConfig | None = None) -> list[str]:
     """Read only the column names from a file (useful for format detection).
 
     Args:
@@ -76,11 +78,16 @@ def read_header(path: str | Path, config: ReaderConfig | None = None) -> list[st
 def _normalise_csv_encoding(encoding: str) -> str:
     """Normalise encoding strings for Polars scan_csv.
 
-    Polars scan_csv only accepts 'utf8' or 'utf8-lossy'.  Common aliases like
-    'utf-8' must be converted before passing through.
+    Polars scan_csv only accepts 'utf8' or 'utf8-lossy'.  Resolve the
+    canonical codec name first (so 'utf-8', 'UTF-8', 'utf_8' all normalise
+    to 'utf-8'), then map the utf-8 family to the 'utf8' token Polars expects.
     """
-    _ALIAS_MAP: dict[str, str] = {"utf-8": "utf8", "UTF-8": "utf8", "UTF8": "utf8"}
-    return _ALIAS_MAP.get(encoding, encoding)
+    try:
+        canonical = codecs.lookup(encoding).name  # e.g. 'utf-8', 'latin-1'
+    except LookupError:
+        return encoding  # let Polars surface its own error
+    _POLARS_MAP: dict[str, str] = {"utf-8": "utf8", "utf-8-sig": "utf8"}
+    return _POLARS_MAP.get(canonical, canonical)
 
 
 def _read_csv(path: Path, cfg: ReaderConfig, default_sep: str) -> pl.LazyFrame:
@@ -94,7 +101,7 @@ def _read_csv(path: Path, cfg: ReaderConfig, default_sep: str) -> pl.LazyFrame:
 
 
 def _read_excel(path: Path, cfg: ReaderConfig) -> pl.LazyFrame:
-    kwargs: dict = {}
+    kwargs: dict[str, Any] = {}
 
     # sheet_name accepts a string name; integers are treated as 0-based sheet
     # indices and mapped to the 1-based sheet_id parameter that pl.read_excel

@@ -1,3 +1,4 @@
+BaseChatModel  # TYPE_CHECKING-only import used in string annotations
 _.delete  # unused method (src/schemashift/registry.py:31)
 _.delete  # unused method (src/schemashift/registry.py:54)
 _.delete  # unused method (src/schemashift/registry.py:92)

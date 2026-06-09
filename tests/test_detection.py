@@ -59,14 +59,13 @@ class TestDetectFormat:
         assert "format_b" in exc_info.value.candidates
 
     def test_partial_match_file_has_extra_columns(self) -> None:
-        """File has more columns than the config needs — should still match."""
+        """Low-specificity matches fall below the default threshold."""
         reg = DictRegistry()
         cfg = _make_config("minimal", ["id"])
         reg.register(cfg)
 
         result = detect_format(["id", "name", "amount", "category", "active"], reg)
-        assert result is not None
-        assert result.name == "minimal"
+        assert result is None
 
     def test_empty_registry_returns_none(self) -> None:
         reg = DictRegistry()
@@ -116,3 +115,20 @@ class TestDetectFormat:
         result = detect_format(["col_a", "col_b", "extra"], reg)
         assert result is not None
         assert result.name == "matching"
+
+    def test_prefers_more_specific_match(self) -> None:
+        reg = DictRegistry()
+        reg.register(_make_config("minimal", ["id", "amount"]))
+        reg.register(_make_config("specific", ["id", "amount", "name"]))
+
+        result = detect_format(["id", "amount", "name"], reg)
+        assert result is not None
+        assert result.name == "specific"
+
+    def test_threshold_can_be_overridden(self) -> None:
+        reg = DictRegistry()
+        reg.register(_make_config("minimal", ["id"]))
+
+        result = detect_format(["id", "name", "amount", "category", "active"], reg, min_score=0.2)
+        assert result is not None
+        assert result.name == "minimal"

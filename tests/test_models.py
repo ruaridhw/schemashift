@@ -1,6 +1,9 @@
 """Tests for schemashift.models."""
 
+import json
+
 import pytest
+from pydantic import ValidationError
 
 from schemashift.errors import ConfigValidationError
 from schemashift.models import ColumnMapping, FormatConfig, ReaderConfig
@@ -11,13 +14,13 @@ class TestColumnMappingValidation:
         col = ColumnMapping(target="out", source="in")
         assert col.source == "in"
         assert col.expr is None
-        assert col.constant is None
+        assert not col.has_constant()
 
     def test_expr_only_is_valid(self):
         col = ColumnMapping(target="out", expr='col("price") * 1.2')
         assert col.expr == 'col("price") * 1.2'
         assert col.source is None
-        assert col.constant is None
+        assert not col.has_constant()
 
     def test_constant_only_is_valid(self):
         col = ColumnMapping(target="flag", constant=True)
@@ -54,6 +57,21 @@ class TestColumnMappingValidation:
         with pytest.raises(ConfigValidationError, match="exactly one"):
             ColumnMapping(target="out", source="in", expr='col("in")', constant=0)
 
+    def test_constant_none_is_valid(self) -> None:
+        col = ColumnMapping(target="flag", constant=None)
+        assert col.has_constant() is True
+        assert col.constant is None
+
+    def test_constant_none_round_trips_json(self) -> None:
+        config = FormatConfig(
+            name="test",
+            columns=[ColumnMapping(target="flag", constant=None)],
+        )
+        dumped = json.loads(config.model_dump_json())
+        reloaded = FormatConfig.model_validate(dumped)
+        assert reloaded.columns[0].constant is None
+        assert reloaded.columns[0].has_constant()
+
 
 class TestColumnMappingDtypeValidation:
     @pytest.mark.parametrize(
@@ -85,8 +103,8 @@ class TestColumnMappingDtypeValidation:
         col = ColumnMapping(target="out", source="in", dtype=dtype)
         assert col.dtype == dtype
 
-    def test_invalid_dtype_raises_config_error(self):
-        with pytest.raises(ConfigValidationError, match="Invalid dtype"):
+    def test_invalid_dtype_raises_validation_error(self):
+        with pytest.raises(ValidationError):
             ColumnMapping(target="out", source="in", dtype="bigint")
 
     def test_none_dtype_allowed(self):
@@ -183,6 +201,20 @@ class TestFormatConfigSourceColumns:
         cols = [ColumnMapping(target="status", constant="active")]
         cfg = FormatConfig(name="f", columns=cols)
         assert cfg.source_columns() == set()
+
+    def test_single_quoted_col_refs_extracted(self):
+        cfg = FormatConfig(
+            name="f",
+            columns=[ColumnMapping(target="out", expr="col('price') * col('qty')")],
+        )
+        assert cfg.source_columns() == {"price", "qty"}
+
+    def test_nested_expr_col_refs_extracted(self):
+        cfg = FormatConfig(
+            name="f",
+            columns=[ColumnMapping(target="out", expr='coalesce(col("a"), col("b"))')],
+        )
+        assert cfg.source_columns() == {"a", "b"}
 
 
 class TestFormatConfigJsonRoundTrip:

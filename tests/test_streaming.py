@@ -4,21 +4,20 @@ import polars as pl
 import pytest
 
 from schemashift.models import ColumnMapping, FormatConfig
-from schemashift.transform import dry_run, transform
+from schemashift.transform import transform
 
 
-class TestLazyEvaluation:
-    """Verify transforms return LazyFrames (not eager DataFrames)."""
+class TestEagerEvaluation:
+    """Verify transforms return DataFrames."""
 
-    def test_transform_returns_lazy_frame(self, tmp_path):
+    def test_transform_returns_dataframe(self, tmp_path):
         csv = tmp_path / "data.csv"
         pl.DataFrame({"x": [1, 2, 3]}).write_csv(str(csv))
         config = FormatConfig(name="t", columns=[ColumnMapping(target="y", source="x")])
         result = transform(str(csv), config)
-        assert isinstance(result, pl.LazyFrame)
+        assert isinstance(result, pl.DataFrame)
 
-    def test_lazy_frame_not_materialised_before_collect(self, tmp_path):
-        """Verify we can chain additional lazy operations before collect."""
+    def test_filter_after_transform(self, tmp_path):
         csv = tmp_path / "data.csv"
         pl.DataFrame({"val": range(100)}).write_csv(str(csv))
         config = FormatConfig(
@@ -27,10 +26,7 @@ class TestLazyEvaluation:
                 ColumnMapping(target="value", source="val"),
             ],
         )
-        lf = transform(str(csv), config)
-        # Chain more lazy ops
-        filtered = lf.filter(pl.col("value") > 50)
-        result = filtered.collect()
+        result = transform(str(csv), config).filter(pl.col("value") > 50)
         assert len(result) == 49  # 51..99 = 49 rows
 
 
@@ -60,7 +56,7 @@ class TestLargeCSV:
                 ColumnMapping(target="amount_dollars", expr='col("amount_cents") / 100'),
             ],
         )
-        result = transform(large_csv, config).collect()
+        result = transform(large_csv, config)
         assert len(result) == 100_000
         assert set(result.columns) == {"item_id", "amount_dollars"}
         assert result["amount_dollars"][0] == pytest.approx(0.0)
@@ -74,17 +70,17 @@ class TestLargeCSV:
                 ColumnMapping(target="cat", source="category"),
             ],
         )
-        result = transform(large_csv, config).filter(pl.col("cat") == "A").collect()
+        result = transform(large_csv, config).filter(pl.col("cat") == "A")
         assert len(result) == 50_000
 
-    def test_large_csv_dry_run_limits_rows(self, large_csv):
+    def test_large_csv_n_rows_limits_output(self, large_csv):
         config = FormatConfig(
             name="t",
             columns=[
                 ColumnMapping(target="item_id", source="id"),
             ],
         )
-        result = dry_run(config, large_csv, n_rows=10)
+        result = transform(large_csv, config, n_rows=10)
         assert len(result) == 10
 
     def test_large_csv_with_constant_column(self, large_csv):
@@ -95,7 +91,7 @@ class TestLargeCSV:
                 ColumnMapping(target="source", constant="big_file_test"),
             ],
         )
-        result = transform(large_csv, config).collect()
+        result = transform(large_csv, config)
         assert result["source"].n_unique() == 1
         assert result["source"][0] == "big_file_test"
 
@@ -124,7 +120,7 @@ class TestLargeTSV:
                 ColumnMapping(target="val", source="value"),
             ],
         )
-        result = transform(large_tsv, config).collect()
+        result = transform(large_tsv, config)
         assert len(result) == 10_000
         assert set(result.columns) == {"row_id", "val"}
 
@@ -145,7 +141,7 @@ class TestLargeParquet:
         df.write_parquet(str(path))
         return str(path)
 
-    def test_parquet_lazy_transform(self, large_parquet):
+    def test_parquet_transform(self, large_parquet):
         config = FormatConfig(
             name="t",
             columns=[
@@ -153,29 +149,25 @@ class TestLargeParquet:
                 ColumnMapping(target="beta", source="b"),
             ],
         )
-        lf = transform(large_parquet, config)
-        assert isinstance(lf, pl.LazyFrame)
-        result = lf.collect()
+        result = transform(large_parquet, config)
+        assert isinstance(result, pl.DataFrame)
         assert len(result) == 100_000
         assert result["beta"][1] == pytest.approx(1.5)
 
-    def test_parquet_sink_csv(self, large_parquet, tmp_path):
-        """Verify we can sink to CSV without collecting into memory."""
+    def test_parquet_write_csv(self, large_parquet, tmp_path):
         config = FormatConfig(
             name="t",
             columns=[
                 ColumnMapping(target="alpha", source="a"),
             ],
         )
-        lf = transform(large_parquet, config)
         out_path = tmp_path / "out.csv"
-        lf.sink_csv(str(out_path))
-        # Verify the output
+        transform(large_parquet, config).write_csv(str(out_path))
         result = pl.read_csv(str(out_path))
         assert len(result) == 100_000
         assert "alpha" in result.columns
 
-    def test_parquet_sink_parquet(self, large_parquet, tmp_path):
+    def test_parquet_write_parquet(self, large_parquet, tmp_path):
         config = FormatConfig(
             name="t",
             columns=[
@@ -184,6 +176,6 @@ class TestLargeParquet:
             ],
         )
         out_path = tmp_path / "out.parquet"
-        transform(large_parquet, config).sink_parquet(str(out_path))
+        transform(large_parquet, config).write_parquet(str(out_path))
         result = pl.read_parquet(str(out_path))
         assert len(result) == 100_000

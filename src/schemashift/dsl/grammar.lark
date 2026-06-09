@@ -1,0 +1,100 @@
+// schemashift DSL grammar (Lark LALR)
+//
+// Operator precedence (lowest → highest via rule depth):
+//   logical < comparison < additive < multiplicative < unary < postfix
+
+start: expr
+
+?expr:           logical
+?logical:        comparison (LOGOP comparison)*
+?comparison:     additive   (CMPOP additive)?
+?additive:       multiplicative ((PLUS | MINUS) multiplicative)*
+?multiplicative: unary      (MULOP unary)*
+?unary:          MINUS unary              -> unary_neg
+               | "not"  unary             -> unary_not
+               | postfix
+
+// postfix handles method chaining: col("x").str.lower().round(2)
+postfix: atom ("." method_step)*
+
+?atom: col_ref
+     | NUMBER  -> number
+     | STRING  -> string
+     | "true"  -> true_lit
+     | "false" -> false_lit
+     | "null"  -> null_lit
+     | "(" expr ")"
+     | when_chain
+     | coalesce_expr
+     | lookup_expr
+     | custom_lookup_expr
+
+// ---------------------------------------------------------------------------
+// Special forms
+// ---------------------------------------------------------------------------
+
+col_ref: "col" "(" STRING ")"
+
+// when/otherwise chain uses right-recursive when_tail to avoid LALR(1) conflict
+// at the ambiguous "." which could be ".when(...)" or ".otherwise(...)"
+when_chain: "when" "(" expr "," expr ")" when_tail
+when_tail:  "." "otherwise" "(" expr ")"                       -> when_otherwise
+          | "." "when" "(" expr "," expr ")" when_tail         -> when_more
+
+coalesce_expr: "coalesce" "(" expr ("," expr)+ ")"
+
+lookup_expr: "lookup" "(" expr "," STRING ")"
+
+custom_lookup_expr: "custom_lookup" "(" expr "," map_lit ("," STRING)? ")"
+
+map_lit:   "{" (map_entry ("," map_entry)* ","?)? "}"
+map_entry: map_scalar ":" map_scalar
+
+// Map scalars return Python values (not polars.Expr) in the transformer
+map_scalar: NUMBER -> map_number
+          | STRING -> map_string
+          | "true" -> map_true
+          | "false" -> map_false
+          | "null" -> map_null
+
+// ---------------------------------------------------------------------------
+// Method steps (allowlist encoded in terminals; contextual LALR lexer enforces)
+// ---------------------------------------------------------------------------
+
+method_step: DIRECT_METHOD "(" args? ")"              -> direct_method
+           | "str" "." STR_METHOD "(" args? ")"       -> str_method
+           | "dt"  "." DT_METHOD  "(" args? ")"       -> dt_method
+
+args: expr ("," expr)*
+
+// ---------------------------------------------------------------------------
+// Terminals
+// ---------------------------------------------------------------------------
+
+DIRECT_METHOD: "round" | "abs" | "cast" | "fill_null" | "fill_nan"
+             | "is_null" | "is_not_null" | "is_nan"
+             | "floor" | "ceil" | "clip" | "pow" | "sqrt"
+
+STR_METHOD: "strip" | "lstrip" | "rstrip"
+          | "lower" | "upper" | "to_lowercase" | "to_uppercase"
+          | "slice" | "replace" | "replace_all" | "replace_regex"
+          | "contains" | "starts_with" | "ends_with"
+          | "to_datetime" | "lengths" | "extract"
+          | "count_matches" | "zfill"
+
+DT_METHOD: "year" | "month" | "day" | "quarter" | "week" | "weekday"
+         | "hour" | "minute" | "second" | "millisecond" | "microsecond"
+         | "ordinal_day" | "strftime" | "timestamp" | "truncate" | "total_seconds"
+
+LOGOP: "&" | "|"
+CMPOP: "==" | "!=" | ">=" | "<=" | ">" | "<"
+MULOP: "*" | "/" | "%"
+PLUS:  "+"
+MINUS: "-"
+
+%import common.NUMBER
+// Double- or single-quoted string with backslash escape sequences (mirrors ast.literal_eval).
+// Replaces common.ESCAPED_STRING which only matches double-quoted strings.
+STRING: /\"[^\"\\]*(?:\\.[^\"\\]*)*\"|'[^'\\]*(?:\\.[^'\\]*)*'/
+%import common.WS
+%ignore WS

@@ -6,7 +6,7 @@ import polars as pl
 import yaml
 from pydantic import BaseModel, Field
 
-from .dtypes import DTYPE_MAP, DType, polars_dtype
+from .dtypes import DType, polars_dtype
 from .errors import SchemaValidationError
 
 
@@ -31,7 +31,7 @@ class TargetSchema(BaseModel):
     columns: list[TargetColumn] = Field(description="Ordered list of expected output columns.")
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "TargetSchema":
+    def from_yaml(cls, path: Path) -> "TargetSchema":
         """Load a TargetSchema from a YAML file."""
         data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         return cls.model_validate(data)
@@ -97,4 +97,4 @@ def _dtypes_compatible(actual: pl.DataType, expected: type[pl.DataType]) -> bool
     return isinstance(actual, expected)
 
 
-__all__ = ["DTYPE_MAP", "DType", "polars_dtype", "TargetColumn", "TargetSchema"]
+__all__ = ["TargetColumn", "TargetSchema"]

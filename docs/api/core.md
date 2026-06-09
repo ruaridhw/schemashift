@@ -5,19 +5,11 @@
 ```
 
 ```{eval-rst}
-.. autofunction:: schemashift.auto_transform
-```
-
-```{eval-rst}
 .. autofunction:: schemashift.smart_transform
 ```
 
 ```{eval-rst}
 .. autofunction:: schemashift.validate_config
-```
-
-```{eval-rst}
-.. autofunction:: schemashift.dry_run
 ```
 
 ```{eval-rst}

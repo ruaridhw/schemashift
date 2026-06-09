@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from click.testing import CliRunner
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from schemashift.cli import cli
 from schemashift.models import FormatConfig

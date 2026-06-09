@@ -39,31 +39,31 @@ class TestCamstarLotMovement:
     def test_transform_produces_canonical_columns(
         self, config: FormatConfig, csv_path: str, schema: TargetSchema
     ) -> None:
-        result = transform(csv_path, config).collect()
+        result = transform(csv_path, config)
         canonical_cols = {c.name for c in schema.columns}
         assert canonical_cols == set(result.columns)
 
     def test_lot_ids_correct(self, config: FormatConfig, csv_path: str) -> None:
-        result = transform(csv_path, config).collect()
+        result = transform(csv_path, config)
         assert result["lot_id"].to_list() == ["L001234", "L001235", "L001236"]
 
     def test_wafer_count_int32(self, config: FormatConfig, csv_path: str) -> None:
-        result = transform(csv_path, config).collect()
+        result = transform(csv_path, config)
         assert result["wafer_count"].dtype == pl.Int32
         assert result["wafer_count"].to_list() == [25, 24, 25]
 
     def test_hold_flag_boolean(self, config: FormatConfig, csv_path: str) -> None:
-        result = transform(csv_path, config).collect()
+        result = transform(csv_path, config)
         assert result["hold_flag"].dtype == pl.Boolean
         assert result["hold_flag"].to_list() == [False, True, False]
 
     def test_data_source_constant(self, config: FormatConfig, csv_path: str) -> None:
-        result = transform(csv_path, config).collect()
+        result = transform(csv_path, config)
         assert result["data_source"].n_unique() == 1
         assert result["data_source"][0] == "camstar"
 
     def test_track_in_time_is_datetime(self, config: FormatConfig, csv_path: str) -> None:
-        result = transform(csv_path, config).collect()
+        result = transform(csv_path, config)
         assert isinstance(result["track_in_time"].dtype, pl.Datetime)
 
     def test_schema_lazy_validation_passes(self, config: FormatConfig, csv_path: str, schema: TargetSchema) -> None:
@@ -89,7 +89,7 @@ class TestFabxLotMovement:
         assert config.reader.separator == "\t"
 
     def test_transform_produces_expected_columns(self, config: FormatConfig, tsv_path: str) -> None:
-        result = transform(tsv_path, config).collect()
+        result = transform(tsv_path, config)
         expected_cols = {
             "lot_id",
             "wafer_count",
@@ -107,25 +107,25 @@ class TestFabxLotMovement:
         assert expected_cols == set(result.columns)
 
     def test_lot_ids(self, config: FormatConfig, tsv_path: str) -> None:
-        result = transform(tsv_path, config).collect()
+        result = transform(tsv_path, config)
         assert result["lot_id"].to_list() == ["L001234", "L001235", "L001236"]
 
     def test_hold_flag_from_integer(self, config: FormatConfig, tsv_path: str) -> None:
-        result = transform(tsv_path, config).collect()
+        result = transform(tsv_path, config)
         assert result["hold_flag"].dtype == pl.Boolean
         assert result["hold_flag"].to_list() == [False, True, False]
 
     def test_data_source_fabx(self, config: FormatConfig, tsv_path: str) -> None:
-        result = transform(tsv_path, config).collect()
+        result = transform(tsv_path, config)
         assert result["data_source"][0] == "fabx"
 
     def test_priority_int32(self, config: FormatConfig, tsv_path: str) -> None:
-        result = transform(tsv_path, config).collect()
+        result = transform(tsv_path, config)
         assert result["priority"].dtype == pl.Int32
         assert result["priority"].to_list() == [1, 3, 2]
 
     def test_track_in_time_is_datetime(self, config: FormatConfig, tsv_path: str) -> None:
-        result = transform(tsv_path, config).collect()
+        result = transform(tsv_path, config)
         assert isinstance(result["track_in_time"].dtype, pl.Datetime)
 
 
@@ -185,7 +185,7 @@ class TestAutoDetection:
 
     def test_filesystem_registry_with_examples(self) -> None:
         examples_dir = EXAMPLES / "configs"
-        reg = FileSystemRegistry(str(examples_dir))
+        reg = FileSystemRegistry(examples_dir)
         configs = reg.list_configs()
         names = {c.name for c in configs}
         assert "camstar_lot_movement" in names

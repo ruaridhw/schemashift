@@ -60,14 +60,8 @@ columns:
 import schemashift as ss
 
 registry = ss.FileSystemRegistry("./configs/")
-result = ss.transform("data.csv", registry.get("provider_x_certificates"))
-result.collect()  # returns a polars.DataFrame
-```
-
-Or auto-detect the format from the registry:
-
-```python
-result = ss.auto_transform("data.csv", registry=registry)
+df = ss.transform("data.csv", registry.get("provider_x_certificates"))
+# returns a polars.DataFrame
 ```
 
 ## LLM-assisted config generation
@@ -122,9 +116,6 @@ schemashift transform data.csv --registry ./configs/ --output result.csv
 
 # Validate a config
 schemashift validate provider_x.json
-
-# Dry-run a config against sample data (first 10 rows)
-schemashift dry-run provider_x.json --sample data.csv
 
 # Generate a config for an unknown file (requires LLM credentials — see below)
 schemashift generate data.csv --target-schema schemas/certificates.yaml --output new_config.json

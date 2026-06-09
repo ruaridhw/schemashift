@@ -4,10 +4,14 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import click
+import polars as pl
 import pytest
 from click.testing import CliRunner
 
 from schemashift.cli import _resolve_schema, cli
+from schemashift.models import ColumnMapping, FormatConfig
+from schemashift.registry import FileSystemRegistry
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -18,17 +22,14 @@ SAMPLE_CSV = str(FIXTURES / "csv" / "sample.csv")
 SALES_CONFIG = str(FIXTURES / "configs" / "sales.json")
 
 
-@pytest.fixture()
+@pytest.fixture
 def runner() -> CliRunner:
     return CliRunner()
 
 
-@pytest.fixture()
+@pytest.fixture
 def registry_dir(tmp_path: Path) -> Path:
     """A temporary registry directory pre-populated with a config."""
-    from schemashift.models import ColumnMapping, FormatConfig
-    from schemashift.registry import FileSystemRegistry
-
     reg = FileSystemRegistry(tmp_path)
     reg.register(
         FormatConfig(
@@ -144,29 +145,6 @@ class TestTransformCommand:
 
 
 # ---------------------------------------------------------------------------
-# dry-run command
-# ---------------------------------------------------------------------------
-
-
-class TestDryRunCommand:
-    def test_dry_run_prints_dataframe(self, runner: CliRunner) -> None:
-        result = runner.invoke(
-            cli,
-            ["dry-run", SALES_CONFIG, "--sample", SAMPLE_CSV],
-        )
-        assert result.exit_code == 0
-        # Output should include column names
-        assert "identifier" in result.output or "customer" in result.output
-
-    def test_dry_run_respects_rows_option(self, runner: CliRunner) -> None:
-        result = runner.invoke(
-            cli,
-            ["dry-run", SALES_CONFIG, "--sample", SAMPLE_CSV, "--rows", "2"],
-        )
-        assert result.exit_code == 0
-
-
-# ---------------------------------------------------------------------------
 # _resolve_schema helper
 # ---------------------------------------------------------------------------
 
@@ -212,8 +190,6 @@ class TestResolveSchema:
         assert schema.name == "test_schema"
 
     def test_registry_multiple_schemas_raises_usage_error(self, tmp_path: Path) -> None:
-        import click
-
         schemas_dir = tmp_path / "schemas"
         schemas_dir.mkdir()
         (schemas_dir / "schema_a.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
@@ -223,15 +199,11 @@ class TestResolveSchema:
             _resolve_schema(None, str(tmp_path))
 
     def test_registry_no_schemas_dir_raises_usage_error(self, tmp_path: Path) -> None:
-        import click
-
         # tmp_path has no schemas/ subdirectory
         with pytest.raises(click.UsageError, match="Provide --target-schema"):
             _resolve_schema(None, str(tmp_path))
 
     def test_no_args_raises_usage_error(self) -> None:
-        import click
-
         with pytest.raises(click.UsageError, match="Provide --target-schema"):
             _resolve_schema(None, None)
 
@@ -264,16 +236,14 @@ columns:
 class TestGenerateCommand:
     """Tests for the generate command using a mocked LLM."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def schema_file(self, tmp_path: Path) -> Path:
         p = tmp_path / "schema.yaml"
         p.write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
         return p
 
-    @pytest.fixture()
+    @pytest.fixture
     def mock_config(self):
-        from schemashift.models import ColumnMapping, FormatConfig
-
         return FormatConfig(
             name="generated_format",
             description="Auto-generated",
@@ -294,7 +264,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config) as mock_gen,
+            patch("schemashift.cli.generate_config", return_value=mock_config) as mock_gen,
         ):
             result = runner.invoke(
                 cli,
@@ -318,7 +288,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
         ):
             result = runner.invoke(
                 cli,
@@ -339,7 +309,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
         ):
             result = runner.invoke(
                 cli,
@@ -370,7 +340,7 @@ class TestGenerateCommand:
         fake_llm = MagicMock()
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
         ):
             result = runner.invoke(
                 cli,
@@ -394,14 +364,12 @@ class TestGenerateCommand:
         schema_file: Path,
         mock_config,
     ) -> None:
-        import polars as pl
-
         fake_llm = MagicMock()
         fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
-            patch("schemashift.transform.dry_run", return_value=fake_sample),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
+            patch("schemashift.cli._transform", return_value=fake_sample.lazy()),
         ):
             result = runner.invoke(
                 cli,
@@ -420,14 +388,12 @@ class TestGenerateCommand:
         schema_file: Path,
         mock_config,
     ) -> None:
-        import polars as pl
-
         fake_llm = MagicMock()
         fake_sample = pl.DataFrame({"id": ["a"], "value": [1.0]})
         with (
             patch("schemashift.cli._load_default_llm", return_value=fake_llm),
-            patch("schemashift.llm.generate_config", return_value=mock_config),
-            patch("schemashift.transform.dry_run", return_value=fake_sample),
+            patch("schemashift.cli.generate_config", return_value=mock_config),
+            patch("schemashift.cli._transform", return_value=fake_sample.lazy()),
         ):
             result = runner.invoke(
                 cli,

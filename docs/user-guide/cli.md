@@ -41,23 +41,6 @@ schemashift validate camstar_mes.json
 # Config 'camstar_mes' is valid.
 ```
 
-## dry-run
-
-Apply a config to the first N rows of a file and print the result. Useful for checking a config before running against the full dataset.
-
-```bash
-schemashift dry-run <CONFIG> [OPTIONS]
-```
-
-| Option | Description |
-|--------|-------------|
-| `--sample PATH` | File to run the dry-run against |
-| `--rows N` | Number of rows to sample (default: 10) |
-
-```bash
-schemashift dry-run camstar_mes.json --sample camstar_mes.csv --rows 5
-```
-
 ## generate
 
 Generate a `FormatConfig` for an unknown file using an LLM.

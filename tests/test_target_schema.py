@@ -13,12 +13,12 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 TEST_SCHEMA_YAML = FIXTURES_DIR / "test_schema.yaml"
 
 
-@pytest.fixture()
+@pytest.fixture
 def test_schema() -> TargetSchema:
     return TargetSchema.from_yaml(TEST_SCHEMA_YAML)
 
 
-@pytest.fixture()
+@pytest.fixture
 def matching_df() -> pl.DataFrame:
     """DataFrame whose schema exactly matches test_schema.yaml."""
     return pl.DataFrame(
@@ -90,7 +90,7 @@ class TestRequiredColumns:
 
 class TestPolarsDtype:
     @pytest.mark.parametrize(
-        "type_str, expected",
+        ("type_str", "expected"),
         [
             ("str", pl.Utf8),
             ("utf8", pl.Utf8),

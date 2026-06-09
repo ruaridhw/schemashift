@@ -79,7 +79,7 @@ The point is that JSON configs are simple enough for an LLM to infer, write, and
 import schemashift as ss
 
 registry = ss.FileSystemRegistry("./configs/")
-df = ss.auto_transform("camstar_mes.csv", registry=registry).collect()
+df = ss.smart_transform("camstar_mes.csv", registry=registry)
 ```
 
 ## When a new format arrives
@@ -99,7 +99,7 @@ df = ss.smart_transform(
     target_schema=schema,
     llm=llm,
     auto_register=True,   # saves the config so next run hits the registry
-).collect()
+)
 ```
 
 ::::{grid} 1 1 3 3
@@ -110,8 +110,8 @@ df = ss.smart_transform(
 :link: getting-started
 :link-type: doc
 
-Register a config once per source. Call `transform()` or `auto_transform()` to apply it — always
-returning a lazy Polars frame, never loading more than you need.
+Register a config once per source. Call `transform()` to apply it — returns a
+`polars.DataFrame`. Pass `n_rows=N` to preview without reading the full file.
 :::
 
 :::{grid-item-card} Auto-detect from a registry
