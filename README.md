@@ -4,6 +4,8 @@ Declarative file format transformer — config-driven column mappings with a saf
 
 Transform tabular files (CSV, XLSX, Parquet, JSON, TSV) into a validated dataset using a single JSON config per source format. When encountering an unknown format, an LLM generates the config automatically.
 
+![schemashift pipeline: source file detection, registry hit or LLM-generated TransformSpec, and validated Dataset output](docs/_static/visuals/pipeline-story.svg)
+
 ## Installation
 
 ```bash

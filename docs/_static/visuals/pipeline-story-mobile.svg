@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 620" role="img" aria-labelledby="pipeline-mobile-title pipeline-mobile-desc">
+  <title id="pipeline-mobile-title">schemashift mobile pipeline from source file to validated dataset</title>
+  <desc id="pipeline-mobile-desc">A source file is detected against a registry. Known formats load a TransformSpec. Unknown formats use an LLM to propose one. Both paths produce a validated Dataset.</desc>
+  <defs>
+    <marker id="mobile-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#3157d5"/>
+    </marker>
+    <marker id="mobile-miss-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#d9480f"/>
+    </marker>
+    <style>
+      .bg{fill:#fbfcff;stroke:#dbe4ff;stroke-width:2}
+      .box{stroke-width:2}
+      .label{font-family:Arial,Helvetica,sans-serif;font-size:17px;font-weight:700;fill:#172033}
+      .small{font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:500;fill:#475569}
+      .note{font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;fill:#475569}
+      .arrow{fill:none;stroke:#3157d5;stroke-width:3;marker-end:url(#mobile-arrow)}
+      .miss{fill:none;stroke:#d9480f;stroke-width:3;stroke-dasharray:8 7;marker-end:url(#mobile-miss-arrow)}
+    </style>
+  </defs>
+
+  <rect class="bg" x="14" y="16" width="362" height="588" rx="22"/>
+  <text class="label" x="38" y="54">When a tabular file arrives...</text>
+  <text class="small" x="38" y="78">Known formats reuse saved specs.</text>
+  <text class="small" x="38" y="96">Unknown formats can generate one.</text>
+
+  <rect class="box" x="62" y="126" width="266" height="66" rx="14" fill="#eef2ff" stroke="#3b5bdb"/>
+  <text class="label" x="195" y="153" text-anchor="middle">Source file</text>
+  <text class="small" x="195" y="174" text-anchor="middle">CSV / XLSX / JSON</text>
+
+  <path class="arrow" d="M195 192 V226"/>
+  <rect class="box" x="62" y="226" width="266" height="66" rx="14" fill="#fff7ed" stroke="#f08c00"/>
+  <text class="label" x="195" y="253" text-anchor="middle">Detector</text>
+  <text class="small" x="195" y="274" text-anchor="middle">column fingerprint</text>
+
+  <path class="arrow" d="M172 292 C126 314 116 344 118 368"/>
+  <rect class="box" x="34" y="368" width="154" height="72" rx="14" fill="#ecfdf5" stroke="#0ca678"/>
+  <text class="label" x="111" y="397" text-anchor="middle">Registry hit</text>
+  <text class="small" x="111" y="419" text-anchor="middle">load spec</text>
+
+  <path class="miss" d="M222 292 C270 314 282 344 282 368"/>
+  <rect class="box" x="202" y="368" width="154" height="72" rx="14" fill="#fff1f2" stroke="#e03131"/>
+  <text class="label" x="279" y="397" text-anchor="middle">Registry miss</text>
+  <text class="small" x="279" y="419" text-anchor="middle">LLM proposes</text>
+
+  <path class="arrow" d="M111 440 C118 472 145 493 178 506"/>
+  <path class="miss" d="M279 440 C270 472 243 493 212 506"/>
+  <rect class="box" x="62" y="506" width="266" height="66" rx="14" fill="#f3f0ff" stroke="#7048e8"/>
+  <text class="label" x="195" y="533" text-anchor="middle">Dataset</text>
+  <text class="small" x="195" y="554" text-anchor="middle">validated output</text>
+
+  <text class="note" x="195" y="590" text-anchor="middle">Generated TransformSpecs become reusable.</text>
+</svg>

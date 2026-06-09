@@ -14,6 +14,15 @@ Requires Python 3.12+.
 
 ## Core concepts
 
+```{raw} html
+<figure class="schemashift-visual schemashift-visual--strip">
+  <picture>
+    <source srcset="_static/visuals/concept-strip-mobile.svg" media="(max-width: 67em)">
+    <img src="_static/visuals/concept-strip.svg" alt="schemashift core concepts: DatasetSchema, TransformSpec, and Registry">
+  </picture>
+</figure>
+```
+
 schemashift has three objects you'll use in every pipeline:
 
 **`DatasetSchema`** — the validated dataset contract: column names, types, nullability, and optional constraints. Defined once in YAML, reused across source configs.
