@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 520" role="img" aria-labelledby="concept-mobile-title concept-mobile-desc">
+  <title id="concept-mobile-title">schemashift core concepts</title>
+  <desc id="concept-mobile-desc">DatasetSchema is the output contract, TransformSpec is the source-to-dataset recipe, and Registry stores reusable known specs.</desc>
+  <defs>
+    <style>
+      .title{font-family:Arial,Helvetica,sans-serif;font-size:19px;font-weight:800;fill:#172033}
+      .eyebrow{font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:800;letter-spacing:.08em;fill:#64748b}
+      .body{font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;fill:#475569}
+      .card{stroke-width:2}
+    </style>
+  </defs>
+  <rect x="22" y="22" width="346" height="140" rx="18" fill="#eef2ff" stroke="#3b5bdb" class="card"/>
+  <text x="50" y="62" class="eyebrow">CONTRACT</text>
+  <text x="50" y="94" class="title">DatasetSchema</text>
+  <text x="50" y="124" class="body">Column names, types, and required</text>
+  <text x="50" y="145" class="body">flags for the output.</text>
+
+  <rect x="22" y="188" width="346" height="140" rx="18" fill="#ecfdf5" stroke="#0ca678" class="card"/>
+  <text x="50" y="228" class="eyebrow">RECIPE</text>
+  <text x="50" y="260" class="title">TransformSpec</text>
+  <text x="50" y="290" class="body">Reader options and mappings for</text>
+  <text x="50" y="311" class="body">one source format.</text>
+
+  <rect x="22" y="354" width="346" height="140" rx="18" fill="#fff7ed" stroke="#f08c00" class="card"/>
+  <text x="50" y="394" class="eyebrow">REUSE</text>
+  <text x="50" y="426" class="title">Registry</text>
+  <text x="50" y="456" class="body">Known specs that detection can</text>
+  <text x="50" y="477" class="body">apply instantly.</text>
+</svg>
