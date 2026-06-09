@@ -10,7 +10,7 @@ from schemashift.detection import detect_format
 from schemashift.models import TransformSpec
 from schemashift.registry import DictRegistry, FileSystemRegistry
 from schemashift.transform import transform, validate_config
-from schemashift.validation import SchemaConfig
+from schemashift.validation import DatasetSchema
 
 FIXTURES = Path(__file__).parent / "fixtures"
 EXAMPLES = Path(__file__).parent.parent / "examples"
@@ -25,8 +25,8 @@ class TestCamstarLotMovement:
         return TransformSpec.model_validate(json.loads(path.read_text()))
 
     @pytest.fixture
-    def schema(self) -> SchemaConfig:
-        return SchemaConfig.from_yaml(FIXTURES / "configs" / "lot_movement_schema.yaml")
+    def schema(self) -> DatasetSchema:
+        return DatasetSchema.from_yaml(FIXTURES / "configs" / "lot_movement_schema.yaml")
 
     @pytest.fixture
     def csv_path(self) -> str:
@@ -37,7 +37,7 @@ class TestCamstarLotMovement:
         assert errors == []
 
     def test_transform_produces_canonical_columns(
-        self, config: TransformSpec, csv_path: str, schema: SchemaConfig
+        self, config: TransformSpec, csv_path: str, schema: DatasetSchema
     ) -> None:
         result = transform(csv_path, config)
         canonical_cols = set(schema.columns.keys())

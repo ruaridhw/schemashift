@@ -250,7 +250,7 @@ class TestTransformSpecJsonRoundTrip:
 
 
 # ---------------------------------------------------------------------------
-# TransformSpec.output_schema
+# TransformSpec.dataset_schema
 # ---------------------------------------------------------------------------
 
 
@@ -258,12 +258,12 @@ class TestTransformSpecOutputSchema:
     def _minimal_columns(self) -> list[dict]:
         return [{"target": "out", "source": "in"}]
 
-    def test_output_schema_defaults_to_none(self) -> None:
+    def test_dataset_schema_defaults_to_none(self) -> None:
         cfg = TransformSpec(name="test", columns=self._minimal_columns())
-        assert cfg.output_schema is None
+        assert cfg.dataset_schema is None
 
-    def test_output_schema_none_round_trips_json(self) -> None:
+    def test_dataset_schema_none_round_trips_json(self) -> None:
         original = TransformSpec(name="test", columns=self._minimal_columns())
         data = original.model_dump()
         restored = TransformSpec.model_validate(data)
-        assert restored.output_schema is None
+        assert restored.dataset_schema is None

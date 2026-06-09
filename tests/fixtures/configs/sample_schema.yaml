@@ -1,5 +1,5 @@
 name: "test_schema"
-description: "Test target schema"
+description: "Test dataset schema"
 columns:
   id:
     type: str

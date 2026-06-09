@@ -1,4 +1,4 @@
-"""Tests for schemashift.validation — SchemaConfig and dy.Schema factory."""
+"""Tests for schemashift.validation — DatasetSchema and dy.Schema factory."""
 
 from pathlib import Path
 
@@ -9,9 +9,9 @@ import yaml
 
 from schemashift.validation import (
     ColumnConstraints,
-    SchemaConfig,
+    DatasetSchema,
     build_dy_schema,
-    resolve_schema,
+    resolve_dataset_schema,
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -23,8 +23,8 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture
-def simple_schema_config() -> SchemaConfig:
-    return SchemaConfig(
+def simple_schema_config() -> DatasetSchema:
+    return DatasetSchema(
         name="test_schema",
         description="A simple test schema",
         columns={
@@ -37,7 +37,7 @@ def simple_schema_config() -> SchemaConfig:
 
 
 @pytest.fixture
-def simple_schema_yaml(tmp_path: Path, simple_schema_config: SchemaConfig) -> Path:
+def simple_schema_yaml(tmp_path: Path, simple_schema_config: DatasetSchema) -> Path:
     data = simple_schema_config.model_dump()
     path = tmp_path / "schema.yaml"
     path.write_text(yaml.dump(data, default_flow_style=False))
@@ -45,47 +45,47 @@ def simple_schema_yaml(tmp_path: Path, simple_schema_config: SchemaConfig) -> Pa
 
 
 # ---------------------------------------------------------------------------
-# SchemaConfig construction and YAML round-trip
+# DatasetSchema construction and YAML round-trip
 # ---------------------------------------------------------------------------
 
 
-class TestSchemaConfigConstruction:
-    def test_basic_fields(self, simple_schema_config: SchemaConfig) -> None:
+class TestDatasetSchemaConstruction:
+    def test_basic_fields(self, simple_schema_config: DatasetSchema) -> None:
         assert simple_schema_config.name == "test_schema"
         assert simple_schema_config.description == "A simple test schema"
         assert len(simple_schema_config.columns) == 4
 
-    def test_column_constraints(self, simple_schema_config: SchemaConfig) -> None:
+    def test_column_constraints(self, simple_schema_config: DatasetSchema) -> None:
         id_col = simple_schema_config.columns["id"]
         assert id_col.type == "int64"
         assert id_col.nullable is False
         assert id_col.primary_key is True
 
-    def test_string_constraints(self, simple_schema_config: SchemaConfig) -> None:
+    def test_string_constraints(self, simple_schema_config: DatasetSchema) -> None:
         name_col = simple_schema_config.columns["name"]
         assert name_col.type == "string"
         assert name_col.min_length == 1
 
-    def test_numeric_constraints(self, simple_schema_config: SchemaConfig) -> None:
+    def test_numeric_constraints(self, simple_schema_config: DatasetSchema) -> None:
         amount_col = simple_schema_config.columns["amount"]
         assert amount_col.type == "float64"
         assert amount_col.min == 0
 
 
-class TestSchemaConfigYamlRoundTrip:
+class TestDatasetSchemaYamlRoundTrip:
     def test_from_yaml(self, simple_schema_yaml: Path) -> None:
-        loaded = SchemaConfig.from_yaml(simple_schema_yaml)
+        loaded = DatasetSchema.from_yaml(simple_schema_yaml)
         assert loaded.name == "test_schema"
         assert len(loaded.columns) == 4
 
     def test_yaml_round_trip_preserves_constraints(self, simple_schema_yaml: Path) -> None:
-        loaded = SchemaConfig.from_yaml(simple_schema_yaml)
+        loaded = DatasetSchema.from_yaml(simple_schema_yaml)
         assert loaded.columns["amount"].min == 0
         assert loaded.columns["name"].min_length == 1
         assert loaded.columns["id"].primary_key is True
 
     def test_yaml_round_trip_preserves_nullable(self, simple_schema_yaml: Path) -> None:
-        loaded = SchemaConfig.from_yaml(simple_schema_yaml)
+        loaded = DatasetSchema.from_yaml(simple_schema_yaml)
         assert loaded.columns["id"].nullable is False
         assert loaded.columns["category"].nullable is True
 
@@ -110,19 +110,19 @@ class TestColumnConstraintsValidation:
 
 
 class TestBuildDySchema:
-    def test_produces_dy_schema_subclass(self, simple_schema_config: SchemaConfig) -> None:
+    def test_produces_dy_schema_subclass(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         assert issubclass(schema, dy.Schema)
 
-    def test_schema_name_matches(self, simple_schema_config: SchemaConfig) -> None:
+    def test_schema_name_matches(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         assert schema.__name__ == "test_schema"
 
-    def test_column_names(self, simple_schema_config: SchemaConfig) -> None:
+    def test_column_names(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         assert set(schema.column_names()) == {"id", "name", "amount", "category"}
 
-    def test_validates_good_data(self, simple_schema_config: SchemaConfig) -> None:
+    def test_validates_good_data(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         df = pl.DataFrame(
             {
@@ -135,7 +135,7 @@ class TestBuildDySchema:
         result = schema.filter(df)
         assert result.result.height == 3
 
-    def test_catches_null_in_required_column(self, simple_schema_config: SchemaConfig) -> None:
+    def test_catches_null_in_required_column(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         df = pl.DataFrame(
             {
@@ -150,7 +150,7 @@ class TestBuildDySchema:
         assert result.failure is not None
         assert "id|nullability" in result.failure.counts()
 
-    def test_catches_min_violation(self, simple_schema_config: SchemaConfig) -> None:
+    def test_catches_min_violation(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         df = pl.DataFrame(
             {
@@ -164,7 +164,7 @@ class TestBuildDySchema:
         assert result.result.height == 2
         assert "amount|min" in result.failure.counts()
 
-    def test_catches_min_length_violation(self, simple_schema_config: SchemaConfig) -> None:
+    def test_catches_min_length_violation(self, simple_schema_config: DatasetSchema) -> None:
         schema = build_dy_schema(simple_schema_config)
         df = pl.DataFrame(
             {
@@ -179,7 +179,7 @@ class TestBuildDySchema:
         assert "name|min_length" in result.failure.counts()
 
     def test_is_in_integer(self) -> None:
-        config = SchemaConfig(
+        config = DatasetSchema(
             name="s",
             columns={"status": ColumnConstraints(type="int64", is_in=[1, 2, 3])},
         )
@@ -189,7 +189,7 @@ class TestBuildDySchema:
         assert result.result.height == 2
 
     def test_is_in_string_via_check(self) -> None:
-        config = SchemaConfig(
+        config = DatasetSchema(
             name="s",
             columns={"currency": ColumnConstraints(type="string", is_in=["USD", "EUR", "GBP"])},
         )
@@ -200,7 +200,7 @@ class TestBuildDySchema:
         assert result.failure.counts()["currency|check__is_in"] == 2
 
     def test_nullable_column_allows_null(self) -> None:
-        config = SchemaConfig(
+        config = DatasetSchema(
             name="s",
             columns={"notes": ColumnConstraints(type="string", nullable=True)},
         )
@@ -211,22 +211,22 @@ class TestBuildDySchema:
 
 
 # ---------------------------------------------------------------------------
-# resolve_schema
+# resolve_dataset_schema
 # ---------------------------------------------------------------------------
 
 
 class TestResolveSchema:
-    def test_resolves_schema_config(self, simple_schema_config: SchemaConfig) -> None:
-        schema = resolve_schema(simple_schema_config)
+    def test_resolves_schema_config(self, simple_schema_config: DatasetSchema) -> None:
+        schema = resolve_dataset_schema(simple_schema_config)
         assert issubclass(schema, dy.Schema)
 
     def test_resolves_dy_schema_class(self) -> None:
         class MySchema(dy.Schema):
             x = dy.Int64()
 
-        result = resolve_schema(MySchema)
+        result = resolve_dataset_schema(MySchema)
         assert result is MySchema
 
     def test_rejects_invalid_type(self) -> None:
-        with pytest.raises(TypeError, match=r"Expected SchemaConfig or dy\.Schema"):
-            resolve_schema("not a schema")  # type: ignore[arg-type]
+        with pytest.raises(TypeError, match=r"Expected DatasetSchema or dy\.Schema"):
+            resolve_dataset_schema("not a schema")  # type: ignore[arg-type]

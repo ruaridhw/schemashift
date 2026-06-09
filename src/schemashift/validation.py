@@ -105,7 +105,7 @@ class ColumnConstraints(BaseModel):
         return self
 
 
-class SchemaConfig(BaseModel):
+class DatasetSchema(BaseModel):
     """Declarative schema definition loadable from YAML/JSON."""
 
     model_config = {"from_attributes": True}
@@ -115,14 +115,14 @@ class SchemaConfig(BaseModel):
     columns: dict[str, ColumnConstraints] = Field(description="Column name → constraints mapping.")
 
     @classmethod
-    def from_yaml(cls, path: Path) -> SchemaConfig:
-        """Load a SchemaConfig from a YAML file."""
+    def from_yaml(cls, path: Path) -> DatasetSchema:
+        """Load a DatasetSchema from a YAML file."""
         data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
         return cls.model_validate(data)
 
 
 # ---------------------------------------------------------------------------
-# Factory: SchemaConfig → dy.Schema class
+# Factory: DatasetSchema → dy.Schema class
 # ---------------------------------------------------------------------------
 
 
@@ -175,29 +175,29 @@ def _build_column(name: str, constraints: ColumnConstraints) -> dy.Column:
     return dy_cls(**kwargs)
 
 
-def build_dy_schema(config: SchemaConfig) -> type[dy.Schema]:
-    """Dynamically construct a dy.Schema subclass from a SchemaConfig."""
+def build_dy_schema(config: DatasetSchema) -> type[dy.Schema]:
+    """Dynamically construct a dy.Schema subclass from a DatasetSchema."""
     attrs: dict[str, Any] = {}
     for col_name, constraints in config.columns.items():
         attrs[col_name] = _build_column(col_name, constraints)
     return type(config.name, (dy.Schema,), attrs)
 
 
-def resolve_schema(schema: SchemaConfig | type[dy.Schema]) -> type[dy.Schema]:
-    """Normalise a schema argument to a dy.Schema class.
+def resolve_dataset_schema(dataset_schema: DatasetSchema | type[dy.Schema]) -> type[dy.Schema]:
+    """Normalise a dataset schema argument to a dy.Schema class.
 
-    Accepts either a SchemaConfig (built into a dy.Schema) or a dy.Schema class directly.
+    Accepts either a DatasetSchema (built into a dy.Schema) or a dy.Schema class directly.
     """
-    if isinstance(schema, SchemaConfig):
-        return build_dy_schema(schema)
-    if isinstance(schema, type) and issubclass(schema, dy.Schema):
-        return schema
-    raise TypeError(f"Expected SchemaConfig or dy.Schema subclass, got {type(schema)}")
+    if isinstance(dataset_schema, DatasetSchema):
+        return build_dy_schema(dataset_schema)
+    if isinstance(dataset_schema, type) and issubclass(dataset_schema, dy.Schema):
+        return dataset_schema
+    raise TypeError(f"Expected DatasetSchema or dy.Schema subclass, got {type(dataset_schema)}")
 
 
 __all__ = [
     "ColumnConstraints",
-    "SchemaConfig",
+    "DatasetSchema",
     "build_dy_schema",
-    "resolve_schema",
+    "resolve_dataset_schema",
 ]

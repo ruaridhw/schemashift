@@ -13,7 +13,7 @@ from .errors import LLMGenerationError
 from .models import ReaderConfig, TransformSpec
 from .readers import read_file
 from .transform import transform, validate_config
-from .validation import SchemaConfig
+from .validation import DatasetSchema
 
 _log = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class LangChainLLMBackend:
             description: str = "",
             drop_unmapped: bool = True,
         ) -> str:
-            """Submit the generated TransformSpec mapping source columns to the target schema.
+            """Submit the generated TransformSpec mapping source columns to the dataset schema.
 
             Each column dict must contain 'target' and exactly one of: 'source' (direct
             column rename), 'expr' (DSL expression string), or 'constant' (literal value).
@@ -161,7 +161,7 @@ def load_default_llm() -> Any:
 
 def build_prompt(
     sample_df: pl.DataFrame,
-    target_schema: SchemaConfig,
+    dataset_schema: DatasetSchema,
     file_columns: list[str],
     example_configs: list[TransformSpec] | None = None,
     format_name: str = "unknown_format",
@@ -171,7 +171,7 @@ def build_prompt(
 
     Args:
         sample_df: A small sample of the source data.
-        target_schema: The desired output schema.
+        dataset_schema: The desired dataset schema.
         file_columns: Column names present in the source file.
         example_configs: Optional list of existing TransformSpecs to show as examples.
         format_name: Suggested name for the new format config.
@@ -186,12 +186,12 @@ def build_prompt(
     parts.append(
         "You are a data engineering assistant. Call the submit_format_config tool with a "
         f"TransformSpec that maps columns from a source file named '{format_name}' to the "
-        "target schema below."
+        "dataset schema below."
     )
 
-    # Target schema
-    parts.append("\n## Target Schema")
-    for col_name, constraints in target_schema.columns.items():
+    # Dataset schema
+    parts.append("\n## Dataset Schema")
+    for col_name, constraints in dataset_schema.columns.items():
         required_label = "optional" if constraints.nullable else "required"
         desc = f" — {constraints.description}" if constraints.description else ""
         parts.append(f"  - {col_name} ({constraints.type}, {required_label}){desc}")
@@ -218,7 +218,7 @@ def build_prompt(
         parts.append(
             f"\n## Example Configs\n"
             f"The following are example configs that map to the same "
-            f"'{target_schema.name}' target schema:"
+            f"'{dataset_schema.name}' dataset schema:"
         )
         parts.extend(ex.model_dump_json(indent=2) for ex in example_configs)
 
@@ -231,7 +231,7 @@ def build_prompt(
 
 def generate_config(
     path: Path,
-    target_schema: SchemaConfig,
+    dataset_schema: DatasetSchema,
     llm: "LLMBackend | Any",
     example_configs: list[TransformSpec] | None = None,
     format_name: str | None = None,
@@ -248,7 +248,7 @@ def generate_config(
 
     Args:
         path: Path to the source data file.
-        target_schema: The desired output schema.
+        dataset_schema: The desired dataset schema.
         llm: An :class:`LLMBackend` or LangChain-compatible model instance.
         example_configs: Optional existing TransformSpecs to include as examples.
         format_name: Name for the generated config. Defaults to the file stem.
@@ -269,7 +269,7 @@ def generate_config(
     """
     df: pl.DataFrame = read_file(path, reader_config).head(n_sample_rows).collect()  # ty: ignore[invalid-assignment]
     inferred_name = format_name if format_name is not None else Path(path).stem
-    prompt = build_prompt(df, target_schema, list(df.columns), example_configs, inferred_name, user_prompt=user_prompt)
+    prompt = build_prompt(df, dataset_schema, list(df.columns), example_configs, inferred_name, user_prompt=user_prompt)
 
     backend: LLMBackend = llm if isinstance(llm, LLMBackend) else LangChainLLMBackend(llm, max_retries=max_retries)
 

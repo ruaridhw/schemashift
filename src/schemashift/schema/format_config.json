@@ -222,6 +222,36 @@
       "title": "ColumnMapping",
       "type": "object"
     },
+    "DatasetSchema": {
+      "description": "Declarative schema definition loadable from YAML/JSON.",
+      "properties": {
+        "columns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ColumnConstraints"
+          },
+          "description": "Column name \u2192 constraints mapping.",
+          "title": "Columns",
+          "type": "object"
+        },
+        "description": {
+          "default": "",
+          "description": "Human-readable description.",
+          "title": "Description",
+          "type": "string"
+        },
+        "name": {
+          "description": "Schema identifier.",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "columns"
+      ],
+      "title": "DatasetSchema",
+      "type": "object"
+    },
     "ReaderConfig": {
       "description": "Low-level options passed to the file reader.",
       "properties": {
@@ -270,48 +300,31 @@
       },
       "title": "ReaderConfig",
       "type": "object"
-    },
-    "SchemaConfig": {
-      "description": "Declarative schema definition loadable from YAML/JSON.",
-      "properties": {
-        "columns": {
-          "additionalProperties": {
-            "$ref": "#/$defs/ColumnConstraints"
-          },
-          "description": "Column name \u2192 constraints mapping.",
-          "title": "Columns",
-          "type": "object"
-        },
-        "description": {
-          "default": "",
-          "description": "Human-readable description.",
-          "title": "Description",
-          "type": "string"
-        },
-        "name": {
-          "description": "Schema identifier.",
-          "title": "Name",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "columns"
-      ],
-      "title": "SchemaConfig",
-      "type": "object"
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
   "description": "Top-level specification for a declarative transformation pipeline.",
   "properties": {
     "columns": {
-      "description": "Ordered list of column mappings defining the output schema.",
+      "description": "Ordered list of column mappings defining the dataset schema.",
       "items": {
         "$ref": "#/$defs/ColumnMapping"
       },
       "title": "Columns",
       "type": "array"
+    },
+    "dataset_schema": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DatasetSchema"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Dataset schema for validation via dataframely."
     },
     "description": {
       "default": "",
@@ -329,18 +342,6 @@
       "description": "Unique identifier for this transform specification.",
       "title": "Name",
       "type": "string"
-    },
-    "output_schema": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/SchemaConfig"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Output schema for validation via dataframely."
     },
     "reader": {
       "$ref": "#/$defs/ReaderConfig",

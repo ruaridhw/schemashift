@@ -22,7 +22,7 @@ from schemashift.registry import DictRegistry, FileSystemRegistry, Registry
 from schemashift.result import FailureInfo, TransformResult
 from schemashift.schema import get_schema, get_schema_path
 from schemashift.transform import transform, validate_config
-from schemashift.validation import ColumnConstraints, SchemaConfig
+from schemashift.validation import ColumnConstraints, DatasetSchema
 
 __all__ = [
     "AmbiguousFormatError",
@@ -31,6 +31,7 @@ __all__ = [
     "ConfigValidationError",
     "DSLRuntimeError",
     "DSLSyntaxError",
+    "DatasetSchema",
     "DictRegistry",
     "FailureInfo",
     "FileSystemRegistry",
@@ -40,7 +41,6 @@ __all__ = [
     "ReaderError",
     "Registry",
     "ReviewRejectedError",
-    "SchemaConfig",
     "SchemaShiftError",
     "SchemaValidationError",
     "TransformResult",

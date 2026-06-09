@@ -12,7 +12,7 @@ from schemashift.errors import DSLSyntaxError, SchemaValidationError
 from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.readers import read_file
 from schemashift.result import FailureInfo, TransformResult
-from schemashift.validation import SchemaConfig, resolve_schema
+from schemashift.validation import DatasetSchema, resolve_dataset_schema
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 def transform(
     path: Path,
     config: TransformSpec,
-    schema: SchemaConfig | type[dy.Schema] | None = None,
+    dataset_schema: DatasetSchema | type[dy.Schema] | None = None,
     *,
     strict: bool = False,
     n_rows: int | None = None,
@@ -34,7 +34,7 @@ def transform(
     Args:
         path: Path to the source file.
         config: TransformSpec describing how to map columns.
-        schema: Override output schema. Falls back to ``config.output_schema``.
+        dataset_schema: Override dataset schema. Falls back to ``config.dataset_schema``.
         strict: If True, raise :class:`SchemaValidationError` when any validation
             failures exist.
         n_rows: If given, collect only the first *n_rows* rows (useful for
@@ -60,9 +60,9 @@ def transform(
     df: pl.DataFrame = lf.collect()  # ty: ignore[invalid-assignment]
 
     # --- Resolve schema and validate ---
-    resolved_schema = schema or config.output_schema
-    if resolved_schema is not None:
-        dy_schema = resolve_schema(resolved_schema)
+    resolved_dataset_schema = dataset_schema or config.dataset_schema
+    if resolved_dataset_schema is not None:
+        dy_schema = resolve_dataset_schema(resolved_dataset_schema)
         filter_result = dy_schema.filter(df)
         valid_df = filter_result.result
         schema_failures = filter_result.failure

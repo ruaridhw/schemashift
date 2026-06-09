@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage
 from schemashift.errors import LLMGenerationError
 from schemashift.llm import build_prompt, generate_config
 from schemashift.models import ColumnMapping, TransformSpec
-from schemashift.validation import ColumnConstraints, SchemaConfig
+from schemashift.validation import ColumnConstraints, DatasetSchema
 
 
 class FakeToolCallingModel(FakeMessagesListChatModel):
@@ -28,7 +28,7 @@ class FakeToolCallingModel(FakeMessagesListChatModel):
 class TestBuildPrompt:
     @pytest.fixture
     def schema(self):
-        return SchemaConfig(
+        return DatasetSchema(
             name="test",
             columns={
                 "id": ColumnConstraints(type="str", nullable=False, description="ID"),
@@ -98,7 +98,7 @@ class TestGenerateConfig:
 
     @pytest.fixture
     def schema(self):
-        return SchemaConfig(
+        return DatasetSchema(
             name="students",
             columns={
                 "student": ColumnConstraints(type="str", nullable=False, description="Student name"),

@@ -149,7 +149,7 @@ class TestFileSystemRegistry:
 
 
 # ---------------------------------------------------------------------------
-# FileSystemRegistry.load_schema
+# FileSystemRegistry.load_dataset_schema
 # ---------------------------------------------------------------------------
 
 _SCHEMA_YAML = """\
@@ -177,12 +177,12 @@ columns:
 class TestFileSystemRegistryLoadSchema:
     def test_returns_none_when_no_schemas_dir(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
-        assert reg.load_schema() is None
+        assert reg.load_dataset_schema() is None
 
     def test_returns_none_when_schemas_dir_empty(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
         (tmp_path / "schemas").mkdir()
-        assert reg.load_schema() is None
+        assert reg.load_dataset_schema() is None
 
     def test_loads_single_yaml_schema(self, tmp_path: Path) -> None:
         schemas_dir = tmp_path / "schemas"
@@ -190,7 +190,7 @@ class TestFileSystemRegistryLoadSchema:
         (schemas_dir / "my_schema.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        schema = reg.load_schema()
+        schema = reg.load_dataset_schema()
 
         assert schema is not None
         assert schema.name == "my_schema"
@@ -202,7 +202,7 @@ class TestFileSystemRegistryLoadSchema:
         (schemas_dir / "my_schema.yml").write_text(_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        schema = reg.load_schema()
+        schema = reg.load_dataset_schema()
 
         assert schema is not None
         assert schema.name == "my_schema"
@@ -215,7 +215,7 @@ class TestFileSystemRegistryLoadSchema:
 
         reg = FileSystemRegistry(tmp_path)
         with pytest.raises(ValueError, match="Multiple schemas found"):
-            reg.load_schema()
+            reg.load_dataset_schema()
 
     def test_loads_named_schema_yaml(self, tmp_path: Path) -> None:
         schemas_dir = tmp_path / "schemas"
@@ -224,7 +224,7 @@ class TestFileSystemRegistryLoadSchema:
         (schemas_dir / "other_schema.yaml").write_text(_OTHER_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        schema = reg.load_schema("my_schema")
+        schema = reg.load_dataset_schema("my_schema")
 
         assert schema is not None
         assert schema.name == "my_schema"
@@ -235,7 +235,7 @@ class TestFileSystemRegistryLoadSchema:
         (schemas_dir / "my_schema.yml").write_text(_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        schema = reg.load_schema("my_schema")
+        schema = reg.load_dataset_schema("my_schema")
 
         assert schema is not None
         assert schema.name == "my_schema"
@@ -246,11 +246,11 @@ class TestFileSystemRegistryLoadSchema:
         (schemas_dir / "my_schema.yaml").write_text(_SCHEMA_YAML, encoding="utf-8")
 
         reg = FileSystemRegistry(tmp_path)
-        assert reg.load_schema("nonexistent") is None
+        assert reg.load_dataset_schema("nonexistent") is None
 
     def test_returns_none_when_named_schema_and_no_schemas_dir(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
-        assert reg.load_schema("any_name") is None
+        assert reg.load_dataset_schema("any_name") is None
 
     def test_path_traversal_rejected(self, tmp_path: Path) -> None:
         reg = FileSystemRegistry(tmp_path)
