@@ -16,12 +16,81 @@ FIXTURES = Path(__file__).parent / "fixtures"
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
 
+class TestBankStatementExamples:
+    """End-to-end tests for bank statement examples used in README/docs."""
+
+    @pytest.fixture
+    def schema(self) -> DatasetSchema:
+        return DatasetSchema.from_yaml(EXAMPLES / "schemas" / "bank_statement.yaml")
+
+    @pytest.fixture
+    def riverbank_config(self) -> TransformSpec:
+        path = EXAMPLES / "transforms" / "riverbank_statement.json"
+        return TransformSpec.model_validate(json.loads(path.read_text()))
+
+    @pytest.fixture
+    def metro_config(self) -> TransformSpec:
+        path = EXAMPLES / "transforms" / "metro_credit_statement.json"
+        return TransformSpec.model_validate(json.loads(path.read_text()))
+
+    def test_riverbank_statement_transform_matches_expected_rows(
+        self, riverbank_config: TransformSpec, schema: DatasetSchema
+    ) -> None:
+        result = transform(FIXTURES / "banking" / "riverbank_statement.csv", riverbank_config, dataset_schema=schema)
+
+        assert result.all_valid
+        assert result.valid["transaction_id"].to_list() == ["RB-1001", "RB-1002", "RB-1003"]
+        assert result.valid["posted_at"].dt.strftime("%Y-%m-%d").to_list() == [
+            "2026-01-03",
+            "2026-01-04",
+            "2026-01-05",
+        ]
+        assert result.valid["description"].to_list() == ["Salary", "Grocery Market", "Electric Utility"]
+        assert result.valid["amount"].to_list() == pytest.approx([2500.0, -82.45, -124.12])
+        assert result.valid["currency"].to_list() == ["GBP", "GBP", "GBP"]
+        assert result.valid["account_id"].to_list() == ["RIVER-001", "RIVER-001", "RIVER-001"]
+        assert result.valid["data_source"].to_list() == ["riverbank", "riverbank", "riverbank"]
+
+    def test_metro_credit_statement_transform_matches_expected_rows(
+        self, metro_config: TransformSpec, schema: DatasetSchema
+    ) -> None:
+        result = transform(FIXTURES / "banking" / "metro_credit_statement.tsv", metro_config, dataset_schema=schema)
+
+        assert result.all_valid
+        assert result.valid["transaction_id"].to_list() == ["MC-9001", "MC-9002", "MC-9003"]
+        assert result.valid["posted_at"].dt.strftime("%Y-%m-%d").to_list() == [
+            "2026-01-02",
+            "2026-01-03",
+            "2026-01-06",
+        ]
+        assert result.valid["description"].to_list() == ["Coffee Bar", "Online Refund", "Train Ticket"]
+        assert result.valid["amount"].to_list() == pytest.approx([-4.2, 19.99, -37.5])
+        assert result.valid["currency"].to_list() == ["GBP", "GBP", "GBP"]
+        assert result.valid["account_id"].to_list() == ["METRO-044", "METRO-044", "METRO-044"]
+        assert result.valid["data_source"].to_list() == ["metro_credit", "metro_credit", "metro_credit"]
+
+    def test_detects_bank_statement_transforms(
+        self, riverbank_config: TransformSpec, metro_config: TransformSpec
+    ) -> None:
+        registry = DictRegistry()
+        registry.register(riverbank_config)
+        registry.register(metro_config)
+
+        riverbank = detect_format(["Date", "Details", "Debit", "Credit", "Balance", "Ref"], registry)
+        metro = detect_format(["Posted", "Narrative", "Amount", "Currency", "Account", "TxnID"], registry)
+
+        assert riverbank is not None
+        assert riverbank.name == "riverbank_statement"
+        assert metro is not None
+        assert metro.name == "metro_credit_statement"
+
+
 class TestCamstarLotMovement:
     """End-to-end test for Camstar MES CSV format."""
 
     @pytest.fixture
     def config(self) -> TransformSpec:
-        path = EXAMPLES / "configs" / "camstar_lot_movement.json"
+        path = EXAMPLES / "transforms" / "camstar_lot_movement.json"
         return TransformSpec.model_validate(json.loads(path.read_text()))
 
     @pytest.fixture
@@ -72,7 +141,7 @@ class TestFabxLotMovement:
 
     @pytest.fixture
     def config(self) -> TransformSpec:
-        path = EXAMPLES / "configs" / "fabx_lot_movement.json"
+        path = EXAMPLES / "transforms" / "fabx_lot_movement.json"
         return TransformSpec.model_validate(json.loads(path.read_text()))
 
     @pytest.fixture
@@ -130,8 +199,8 @@ class TestAutoDetection:
     @pytest.fixture
     def registry(self) -> DictRegistry:
         r = DictRegistry()
-        camstar_path = EXAMPLES / "configs" / "camstar_lot_movement.json"
-        fabx_path = EXAMPLES / "configs" / "fabx_lot_movement.json"
+        camstar_path = EXAMPLES / "transforms" / "camstar_lot_movement.json"
+        fabx_path = EXAMPLES / "transforms" / "fabx_lot_movement.json"
         r.register(TransformSpec.model_validate(json.loads(camstar_path.read_text())))
         r.register(TransformSpec.model_validate(json.loads(fabx_path.read_text())))
         return r
@@ -179,7 +248,7 @@ class TestAutoDetection:
         assert config is None
 
     def test_filesystem_registry_with_examples(self) -> None:
-        examples_dir = EXAMPLES / "configs"
+        examples_dir = EXAMPLES / "transforms"
         reg = FileSystemRegistry(examples_dir)
         configs = reg.list_configs()
         names = {c.name for c in configs}
