@@ -91,6 +91,20 @@ class TestDatasetSchemaYamlRoundTrip:
 
 
 class TestColumnConstraintsValidation:
+    @pytest.mark.parametrize(
+        ("dtype", "dy_column"),
+        [
+            ("string", dy.String),
+            ("integer", dy.Int64),
+            ("number", dy.Float64),
+            ("boolean", dy.Bool),
+        ],
+    )
+    def test_json_schema_primitive_aliases_map_to_dataframely_columns(self, dtype, dy_column) -> None:
+        schema = build_dy_schema(DatasetSchema(name="aliases", columns={"value": ColumnConstraints(type=dtype)}))
+
+        assert isinstance(schema.value, dy_column)
+
     def test_string_with_numeric_constraint_raises(self) -> None:
         with pytest.raises(ValueError, match="not valid for string type"):
             ColumnConstraints(type="string", min=0)
@@ -102,6 +116,17 @@ class TestColumnConstraintsValidation:
     def test_float_with_regex_raises(self) -> None:
         with pytest.raises(ValueError, match="only valid for string types"):
             ColumnConstraints(type="float64", regex=r"\d+")
+
+    def test_null_type_is_not_supported_for_dataframely_schema(self) -> None:
+        schema = DatasetSchema(name="nulls", columns={"value": ColumnConstraints(type="null")})
+
+        with pytest.raises(ValueError, match="No dataframely column type"):
+            build_dy_schema(schema)
+
+    @pytest.mark.parametrize("dtype", ["array", "object"])
+    def test_json_schema_container_types_are_rejected(self, dtype) -> None:
+        with pytest.raises(ValueError, match="Input should be"):
+            ColumnConstraints(type=dtype)
 
 
 # ---------------------------------------------------------------------------

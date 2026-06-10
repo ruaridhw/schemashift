@@ -11,6 +11,17 @@ from schemashift.registry import DictRegistry
 from schemashift.validation import ColumnConstraints, DatasetSchema
 
 
+class SchemaRegistry(DictRegistry):
+    def __init__(self, dataset_schema: DatasetSchema) -> None:
+        super().__init__()
+        self._dataset_schema = dataset_schema
+
+    def load_dataset_schema(self, name: str | None = None) -> DatasetSchema | None:
+        if name == self._dataset_schema.name:
+            return self._dataset_schema
+        return None
+
+
 @pytest.fixture
 def sample_csv(tmp_path):
     p = tmp_path / "data.csv"
@@ -40,6 +51,7 @@ def schema():
 def matching_config():
     return TransformSpec(
         name="student_format",
+        schema_name="students",
         columns=[
             ColumnMapping(target="student_name", source="Name"),
             ColumnMapping(target="score", source="Score", dtype="float64"),
@@ -72,6 +84,22 @@ class TestRegistryHit:
         reg.register(matching_config)
         result = smart_transform(sample_csv, registry=reg)
         assert "student_name" in result.valid.columns
+
+    def test_uses_config_schema_name_to_load_registry_schema(self, sample_csv, matching_config):
+        schema = DatasetSchema(
+            name="students",
+            columns={
+                "student_name": ColumnConstraints(type="str", nullable=False),
+                "score": ColumnConstraints(type="number", nullable=False, min=90),
+                "grade": ColumnConstraints(type="string", nullable=False),
+            },
+        )
+        reg = SchemaRegistry(schema)
+        reg.register(matching_config)
+
+        result = smart_transform(sample_csv, registry=reg)
+
+        assert result.valid["student_name"].to_list() == ["Alice"]
 
 
 class TestLLMGeneration:

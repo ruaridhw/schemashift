@@ -1,139 +1,5 @@
 {
   "$defs": {
-    "ColumnConstraints": {
-      "description": "Per-column schema definition mapping to a dataframely column type + constraints.",
-      "properties": {
-        "description": {
-          "default": "",
-          "description": "Human-readable description.",
-          "title": "Description",
-          "type": "string"
-        },
-        "is_in": {
-          "anyOf": [
-            {
-              "items": {},
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Allowed values (integers only natively; strings use check).",
-          "title": "Is In"
-        },
-        "max": {
-          "default": null,
-          "description": "Maximum value (inclusive).",
-          "title": "Max"
-        },
-        "max_exclusive": {
-          "default": null,
-          "description": "Maximum value (exclusive).",
-          "title": "Max Exclusive"
-        },
-        "max_length": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Maximum string length.",
-          "title": "Max Length"
-        },
-        "min": {
-          "default": null,
-          "description": "Minimum value (inclusive).",
-          "title": "Min"
-        },
-        "min_exclusive": {
-          "default": null,
-          "description": "Minimum value (exclusive).",
-          "title": "Min Exclusive"
-        },
-        "min_length": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Minimum string length.",
-          "title": "Min Length"
-        },
-        "nullable": {
-          "default": false,
-          "description": "Whether null values are allowed.",
-          "title": "Nullable",
-          "type": "boolean"
-        },
-        "primary_key": {
-          "default": false,
-          "description": "Whether this column is a primary key.",
-          "title": "Primary Key",
-          "type": "boolean"
-        },
-        "regex": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Regex pattern the string must match.",
-          "title": "Regex"
-        },
-        "type": {
-          "description": "Polars dtype string (e.g. 'int64', 'str', 'float64').",
-          "enum": [
-            "str",
-            "string",
-            "utf8",
-            "int8",
-            "int16",
-            "int32",
-            "int64",
-            "integer",
-            "uint8",
-            "uint16",
-            "uint32",
-            "uint64",
-            "float32",
-            "float64",
-            "number",
-            "bool",
-            "boolean",
-            "date",
-            "datetime",
-            "time",
-            "duration",
-            "binary",
-            "categorical",
-            "null"
-          ],
-          "title": "Type",
-          "type": "string"
-        }
-      },
-      "required": [
-        "type"
-      ],
-      "title": "ColumnConstraints",
-      "type": "object"
-    },
     "ColumnMapping": {
       "description": "Describes how to produce one output column.",
       "properties": {
@@ -222,36 +88,6 @@
       "title": "ColumnMapping",
       "type": "object"
     },
-    "DatasetSchema": {
-      "description": "Declarative schema definition loadable from YAML/JSON.",
-      "properties": {
-        "columns": {
-          "additionalProperties": {
-            "$ref": "#/$defs/ColumnConstraints"
-          },
-          "description": "Column name \u2192 constraints mapping.",
-          "title": "Columns",
-          "type": "object"
-        },
-        "description": {
-          "default": "",
-          "description": "Human-readable description.",
-          "title": "Description",
-          "type": "string"
-        },
-        "name": {
-          "description": "Schema identifier.",
-          "title": "Name",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "columns"
-      ],
-      "title": "DatasetSchema",
-      "type": "object"
-    },
     "ReaderConfig": {
       "description": "Low-level options passed to the file reader.",
       "properties": {
@@ -314,18 +150,6 @@
       "title": "Columns",
       "type": "array"
     },
-    "dataset_schema": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/DatasetSchema"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Dataset schema for validation via dataframely."
-    },
     "description": {
       "default": "",
       "description": "Human-readable description of this transform.",
@@ -346,6 +170,19 @@
     "reader": {
       "$ref": "#/$defs/ReaderConfig",
       "description": "Low-level reader options."
+    },
+    "schema_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Name of the registry DatasetSchema this spec targets.",
+      "title": "Schema Name"
     },
     "version": {
       "default": 1,

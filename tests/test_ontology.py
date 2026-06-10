@@ -46,17 +46,17 @@ class TestPublicOntology:
 
 
 class TestDatasetSchemaField:
-    def test_transform_spec_uses_dataset_schema_field(self) -> None:
+    def test_transform_spec_uses_schema_name_field(self) -> None:
         spec = TransformSpec(
             name="records",
-            dataset_schema=_dataset_schema(),
+            schema_name="records",
             columns=[ColumnMapping(target="id", source="raw_id")],
         )
 
-        assert spec.dataset_schema is not None
-        assert spec.model_dump()["dataset_schema"]["name"] == "records"
+        assert spec.schema_name == "records"
+        assert spec.model_dump()["schema_name"] == "records"
 
-    @pytest.mark.parametrize("legacy_field", ["target_schema", "schema", "output_schema"])
+    @pytest.mark.parametrize("legacy_field", ["target_schema", "schema", "output_schema", "dataset_schema"])
     def test_legacy_schema_fields_are_rejected(self, legacy_field: str) -> None:
         with pytest.raises(ValidationError):
             TransformSpec.model_validate(

@@ -141,6 +141,7 @@ class TestGenerateConfig:
     def test_successful_generation(self, csv_file, schema):
         config = generate_config(csv_file, schema, llm=self._llm(self._valid_args()))
         assert config.name == "fmt"
+        assert config.schema_name == "students"
         assert len(config.columns) == 2
 
     def test_uses_path_stem_as_name(self, csv_file, schema):

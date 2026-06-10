@@ -75,7 +75,10 @@ def smart_transform(
         n_sample_rows=n_sample_rows,
         reader_config=reader_config,
     )
-    return transform(path, config, dataset_schema=dataset_schema, strict=strict)
+    resolved_dataset_schema = dataset_schema
+    if resolved_dataset_schema is None and config.schema_name is not None:
+        resolved_dataset_schema = registry.load_dataset_schema(config.schema_name)
+    return transform(path, config, dataset_schema=resolved_dataset_schema, strict=strict)
 
 
 # ---------------------------------------------------------------------------

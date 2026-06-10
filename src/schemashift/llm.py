@@ -49,6 +49,7 @@ class LangChainLLMBackend:
         inferred_name = str(schema["format_name"])
         path = Path(schema["path"])
         result_box: list[dict[str, Any]] = []
+        schema_name = str(schema.get("schema_name") or "")
 
         @tool
         def submit_format_config(
@@ -70,6 +71,8 @@ class LangChainLLMBackend:
                 "columns": columns,
                 "drop_unmapped": drop_unmapped,
             }
+            if schema_name:
+                data["schema_name"] = schema_name
 
             try:
                 config = TransformSpec.model_validate(data)
@@ -279,6 +282,7 @@ def generate_config(
             {
                 "format_name": inferred_name,
                 "path": path,
+                "schema_name": dataset_schema.name,
             },
         )
     except LLMGenerationError:

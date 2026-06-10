@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field, model_validator
 from .dsl import collect_col_refs
 from .dtypes import DTYPE_MAP, DType
 from .errors import ConfigValidationError
-from .validation import DatasetSchema  # noqa: TC001  # runtime import needed for Pydantic field resolution
 
 # Sentinel for optional Any-typed fields where None is a valid user-supplied value.
 # Using PydanticUndefined as a default makes Pydantic treat the field as required,
@@ -110,9 +109,7 @@ class TransformSpec(BaseModel):
     name: str = Field(description="Unique identifier for this transform specification.")
     description: str = Field(default="", description="Human-readable description of this transform.")
     version: int = Field(default=1, description="Spec version. Increment on breaking changes.", ge=1)
-    dataset_schema: DatasetSchema | None = Field(
-        default=None, description="Dataset schema for validation via dataframely."
-    )
+    schema_name: str | None = Field(default=None, description="Name of the registry DatasetSchema this spec targets.")
     reader: ReaderConfig = Field(default_factory=ReaderConfig, description="Low-level reader options.")
     columns: list[ColumnMapping] = Field(description="Ordered list of column mappings defining the dataset schema.")
     drop_unmapped: bool = Field(default=True, description="Drop source columns not referenced by any mapping.")
