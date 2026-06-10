@@ -48,7 +48,7 @@ ColumnMapping → pl.Expr:
 - `skip_rows`, `sheet_name`, `separator`, `encoding`
 
 **TransformSpec:**
-- `name`, `description`, `version`, `dataset_schema`, `reader`, `columns`, `drop_unmapped`
+- `name`, `description`, `version`, `schema_name`, `reader`, `columns`, `drop_unmapped`
 - `source_columns()` extracts all referenced source column names
 
 ### Error Hierarchy

@@ -1,200 +1,157 @@
 # schemashift
 
-Declarative file format transformer — config-driven column mappings with a safe expression DSL.
+Declarative file format transformer with schema validation and a safe expression DSL.
 
-Transform tabular files (CSV, XLSX, Parquet, JSON, TSV) into a validated dataset using a single JSON config per source format. When encountering an unknown format, an LLM generates the config automatically.
+Enterprise software deployments often depend on loading canonical datasets from client source systems, but those systems export whatever they want: third-party flat files, formats you have never seen before, and arbitrary Excel workbooks. Wiring each one up by hand means bespoke pandas or Polars code for every integration.
 
-## Installation
+**schemashift** solves this with a reusable `DatasetSchema`, source-specific `TransformSpec` files, and a closed DSL that compiles to Polars expressions. When a new source format arrives, `smart_transform()` can detect an existing transform or ask an LLM to generate one and validate it before saving.
+
+![schemashift pipeline: source file detection, registry hit or LLM-generated TransformSpec, and validated Dataset output](docs/_static/visuals/pipeline-story.svg)
+
+## Thirty-second example
+
+**1. Define what you want out:**
+
+```yaml
+# examples/schemas/bank_statement.yaml
+name: bank_statement
+columns:
+  transaction_id:
+    type: string
+    nullable: false
+  posted_at:
+    type: date
+    nullable: false
+  description:
+    type: string
+    nullable: false
+  amount:
+    type: number
+    nullable: false
+  currency:
+    type: string
+    nullable: false
+  account_id:
+    type: string
+    nullable: false
+  data_source:
+    type: string
+    nullable: false
+```
+
+**2. Write a transform for one source format:**
+
+Riverbank provides debit and credit columns separately:
+
+```json
+{
+  "name": "riverbank_statement",
+  "description": "Riverbank current account statement export",
+  "schema_name": "bank_statement",
+  "columns": [
+    { "target": "transaction_id", "source": "Ref" },
+    { "target": "posted_at", "expr": "col('Date').str.to_datetime('%Y-%m-%d')", "dtype": "date" },
+    { "target": "description", "source": "Details" },
+    {
+      "target": "amount",
+      "expr": "col('Credit').cast('float64').fill_null(0) - col('Debit').cast('float64').fill_null(0)",
+      "dtype": "number"
+    },
+    { "target": "currency", "constant": "GBP" },
+    { "target": "account_id", "constant": "RIVER-001" },
+    { "target": "data_source", "constant": "riverbank" }
+  ]
+}
+```
+
+Metro Credit provides a tab-separated card export with already-signed amounts. That transform lives next to the Riverbank one in `examples/transforms/`.
+
+**3. Transform:**
+
+```python
+import schemashift as ss
+
+registry = ss.FileSystemRegistry("./examples/transforms/")
+schema = ss.DatasetSchema.from_yaml("examples/schemas/bank_statement.yaml")
+result = ss.smart_transform("riverbank_statement.csv", registry=registry, dataset_schema=schema)
+
+df = result.valid
+```
+
+## When a new format arrives
+
+If a transform is saved in the registry, schemashift reloads it instantly. Otherwise, if an LLM is provided, it generates a `TransformSpec`, validates it end-to-end, and can save it for next time.
+
+```python
+import schemashift as ss
+from langchain_anthropic import ChatAnthropic
+
+schema = ss.DatasetSchema.from_yaml("examples/schemas/bank_statement.yaml")
+registry = ss.FileSystemRegistry("./examples/transforms/")
+llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
+
+result = ss.smart_transform(
+    "metro_credit_statement.tsv",
+    registry=registry,
+    dataset_schema=schema,
+    llm=llm,
+    auto_register=True,
+)
+```
+
+## Install
+
+Requires Python 3.12+.
 
 ```bash
 # Core library
 pip install schemashift
 
-# With LLM config generation
+# With LLM transform generation
 pip install "schemashift[llm]"
-```
-
-## Quick start
-
-### 1. Define a dataset schema
-
-```yaml
-# schemas/certificates.yaml
-name: canonical_certificate
-columns:
-  certificate_id:
-    type: str
-    nullable: false
-  volume_mwh:
-    type: float64
-    nullable: false
-  issue_date:
-    type: datetime
-    nullable: false
-  technology:
-    type: str
-    nullable: false
-  data_source:
-    type: str
-    nullable: false
-```
-
-### 2. Write a config for a known source format
-
-```json
-{
-  "name": "provider_x_certificates",
-  "columns": [
-    { "target": "certificate_id", "source": "Cert. ID" },
-    { "target": "volume_mwh", "expr": "col(\"Volume (kWh)\") / 1000" },
-    { "target": "issue_date", "expr": "col(\"Issue Date\").str.to_datetime(\"%Y-%m-%d\")" },
-    { "target": "technology", "source": "Tech Type" },
-    { "target": "data_source", "constant": "provider_x" }
-  ]
-}
-```
-
-### 3. Transform
-
-```python
-import schemashift as ss
-
-registry = ss.FileSystemRegistry("./configs/")
-schema = ss.DatasetSchema.from_yaml("schemas/certificates.yaml")
-result = ss.transform("data.csv", registry.get("provider_x_certificates"), dataset_schema=schema)
-# result.valid is a polars.DataFrame; result.failures contains validation details
-```
-
-## LLM-assisted config generation
-
-When a file arrives from a new source with no matching config, `smart_transform` generates one automatically:
-
-```python
-import schemashift as ss
-
-schema = ss.DatasetSchema.from_yaml("schemas/certificates.yaml")
-registry = ss.FileSystemRegistry("./configs/")
-
-# bring your own LangChain-compatible LLM:
-from langchain_anthropic import ChatAnthropic
-llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
-
-# or via Azure AI Foundry:
-llm = ChatAnthropic(
-    model="claude-haiku-4-5",
-    api_key="<FOUNDRY_API_KEY>",
-    base_url="https://<resource>.services.ai.azure.com/anthropic",
-)
-
-result = ss.smart_transform(
-    "unknown_source.csv",
-    registry=registry,
-    dataset_schema=schema,
-    llm=llm,
-    auto_register=True,   # saves the generated config for next time
-)
-```
-
-With a human review step:
-
-```python
-def review(config, sample_df):
-    print(config.model_dump_json(indent=2))
-    print(sample_df)
-    return config  # return None to reject
-
-result = ss.smart_transform(..., review_fn=review)
 ```
 
 ## CLI
 
 ```bash
-# Transform with an explicit config
-schemashift transform data.csv --config provider_x.json --output result.csv
+# Transform with an explicit TransformSpec
+schemashift transform riverbank_statement.csv --config examples/transforms/riverbank_statement.json --output result.csv
 
-# Auto-detect format from registry
-schemashift transform data.csv --registry ./configs/ --output result.csv
+# Auto-detect format from a transform registry
+schemashift transform riverbank_statement.csv --registry ./examples/transforms/ --output result.csv
 
-# Validate a config
-schemashift validate provider_x.json
+# Validate a TransformSpec
+schemashift validate examples/transforms/riverbank_statement.json
 
-# Generate a config for an unknown file (requires LLM credentials — see below)
-schemashift generate data.csv --dataset-schema schemas/certificates.yaml --output new_config.json
+# Generate a transform for an unknown file
+schemashift generate data.csv --dataset-schema examples/schemas/bank_statement.yaml --output new_transform.json
 
 # Generate with interactive review before saving
-schemashift generate data.csv --registry ./configs/ --interactive
-
-# List registered configs
-schemashift list --registry ./configs/
-```
-
-### LLM credentials
-
-The `generate` command auto-detects credentials from environment variables (a `.env` file in the working directory is loaded automatically):
-
-| Priority | Variables | Provider |
-|----------|-----------|----------|
-| 1 | `FOUNDRY_API_KEY` + `FOUNDRY_ENDPOINT` (or `FOUNDRY_RESOURCE`) | Azure AI Foundry |
-| 2 | `ANTHROPIC_API_KEY` | Anthropic |
-
-**Azure AI Foundry** (e.g. an Azure AI project running Claude):
-
-```bash
-FOUNDRY_API_KEY=<key>
-FOUNDRY_ENDPOINT=https://<resource>.services.ai.azure.com/api/projects/<project>
-MODEL_NAME=claude-haiku-4-5   # optional, this is the default
-```
-
-If you only set `FOUNDRY_RESOURCE` (without `FOUNDRY_ENDPOINT`), the endpoint is inferred as
-`https://<FOUNDRY_RESOURCE>.services.ai.azure.com/api/projects/<FOUNDRY_RESOURCE>`.
-
-**Anthropic (direct)**:
-
-```bash
-ANTHROPIC_API_KEY=<key>
+schemashift generate data.csv --registry ./examples/transforms/ --dataset-schema examples/schemas/bank_statement.yaml --interactive
 ```
 
 ## Expression DSL
 
 Column mappings support a safe, closed expression language that compiles to native Polars expressions:
 
-```
-col("Volume (kWh)") / 1000                          # arithmetic
-col("Name").str.strip().str.lower()                 # string ops
-col("Date").str.to_datetime("%Y-%m-%d")             # date parsing
-col("dt").dt.year()                                 # date extraction
-when(col("Type") == "solar", "Solar").otherwise("Other")   # conditionals
-when(col("T") == "A", "A").when(col("T") == "B", "B").otherwise("C")
-coalesce(col("A"), col("B"), "fallback")            # first non-null
-col("x").cast("float64")                            # type casting
-col("Code").str.replace_regex("\\d+", "NUM")        # regex replace
+```text
+col('Amount') / 1000
+col('Name').str.strip().str.lower()
+col('Date').str.to_datetime('%Y-%m-%d')
+col('dt').dt.year()
+when(col('Type') == 'refund', 'Refund').otherwise('Spend')
+coalesce(col('Credit'), col('Debit'), 0)
+col('Amount').cast('float64')
+col('Code').str.replace_regex('\\d+', 'NUM')
 ```
 
-No `eval()`, no arbitrary Python — only the explicitly allowlisted operations above.
+No `eval()`, no arbitrary Python, only explicitly allowlisted operations.
 
 ## Config reference
 
-```json
-{
-  "name": "my_format",
-  "description": "Optional description",
-  "version": 1,
-  "reader": {
-    "skip_rows": 0,
-    "sheet_name": "Sheet1",
-    "separator": ",",
-    "encoding": "utf-8"
-  },
-  "columns": [
-    { "target": "out_col", "source": "SourceCol" },
-    { "target": "out_col", "expr": "col(\"X\") / 1000", "dtype": "float64" },
-    { "target": "out_col", "constant": "fixed_value", "fillna": "unknown" }
-  ],
-  "drop_unmapped": true
-}
-```
+Each `ColumnMapping` requires exactly one of `source`, `expr`, or `constant`. The `dtype` field casts the result; `fillna` fills nulls after the mapping is applied. Persisted transforms may set `schema_name` to reference a `DatasetSchema` in a registry, while runtime calls can pass a `DatasetSchema` directly with `dataset_schema=...`.
 
-Each column mapping requires exactly one of `source`, `expr`, or `constant`. The `dtype` field casts the result; `fillna` fills nulls after the mapping is applied. Pass a `DatasetSchema` at runtime with `dataset_schema=...`, or embed a `dataset_schema` object in the `TransformSpec` when a config should carry its validation contract with it.
+Supported dtype names include Polars names such as `str`, `int64`, `float64`, and `bool`, plus JSON Schema primitive aliases `string`, `integer`, `number`, and `boolean`. JSON Schema container types `array` and `object` are not supported.
 
 ## Supported file formats
 

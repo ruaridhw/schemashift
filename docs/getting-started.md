@@ -16,11 +16,11 @@ Requires Python 3.12+.
 
 schemashift has three objects you'll use in every pipeline:
 
-**`DatasetSchema`** — the validated dataset contract: column names, types, nullability, and optional constraints. Defined once in YAML, reused across source configs.
+**`DatasetSchema`** — the validated dataset contract: column names, types, nullability, and optional constraints. Defined once in YAML, reused across source transforms.
 
-**`TransformSpec`** — describes how to turn one specific source file into the dataset schema. Lives in a JSON file. Each column mapping uses exactly one of `source` (rename), `expr` (DSL expression), or `constant` (literal value).
+**`TransformSpec`** — describes how to turn one specific source file into the dataset schema. Lives in a JSON file under a `transforms/` directory. Each column mapping uses exactly one of `source` (rename), `expr` (DSL expression), or `constant` (literal value).
 
-**`Registry`** — a collection of `TransformSpec` objects. `FileSystemRegistry` reads JSON files from a directory. `DictRegistry` is for in-memory/testing use.
+**`Registry`** — a collection of `TransformSpec` objects. `FileSystemRegistry` reads JSON transform files from a directory. `DictRegistry` is for in-memory/testing use.
 
 ## Step-by-step setup
 
@@ -85,29 +85,30 @@ Each MES or ERP system exports lot data in a different shape. Here's a config fo
 ```json
 {
   "name": "camstar_mes",
+  "schema_name": "lot_movement",
   "columns": [
     { "target": "lot_id",        "source": "LOT_ID" },
     { "target": "wafer_count",   "source": "QTY", "dtype": "int32" },
     { "target": "operation",     "source": "CURRENT_OPER" },
     { "target": "step_sequence", "source": "OPER_SEQ", "dtype": "int32" },
     { "target": "tool_id",       "source": "RESOURCE" },
-    { "target": "track_in_time", "expr": "col(\"TRACKIN_DT\").str.to_datetime(\"%Y-%m-%d %H:%M:%S\")" },
-    { "target": "track_out_time","expr": "col(\"TRACKOUT_DT\").str.to_datetime(\"%Y-%m-%d %H:%M:%S\")" },
+    { "target": "track_in_time", "expr": "col('TRACKIN_DT').str.to_datetime('%Y-%m-%d %H:%M:%S')" },
+    { "target": "track_out_time","expr": "col('TRACKOUT_DT').str.to_datetime('%Y-%m-%d %H:%M:%S')" },
     { "target": "recipe",        "source": "RECIPE_NAME" },
     { "target": "route",         "source": "FLOW" },
     { "target": "priority",      "source": "LOT_PRIORITY", "dtype": "int32" },
-    { "target": "hold_flag",     "expr": "col(\"HOLD_STATUS\") != \"NONE\"" },
+    { "target": "hold_flag",     "expr": "col('HOLD_STATUS') != 'NONE'" },
     { "target": "data_source",   "constant": "camstar_mes" }
   ]
 }
 ```
 
-Save this as `configs/camstar_mes.json`.
+Save this as `transforms/camstar_mes.json`.
 
 ### 3. Transform a file
 
 ```python
-registry = ss.FileSystemRegistry("./configs/")
+registry = ss.FileSystemRegistry("./transforms/")
 config = registry.get("camstar_mes")
 
 schema = ss.DatasetSchema.from_yaml("schemas/lot_movement.yaml")
@@ -119,13 +120,13 @@ Pass `n_rows=N` to preview the first N rows without reading the whole file.
 
 ### 4. Auto-detect the format
 
-Once you have multiple configs registered (e.g. `camstar_mes`, `fabx_tsv`, `sap_erp`), let schemashift pick the right one based on column fingerprinting:
+Once you have multiple transforms registered (e.g. `camstar_mes`, `fabx_tsv`, `sap_erp`), let schemashift pick the right one based on column fingerprinting:
 
 ```python
 result = ss.smart_transform("camstar_mes.csv", registry=registry, dataset_schema=schema)
 ```
 
-The detector matches on the file's column names. If two configs both match, `AmbiguousFormatError` is raised — add more columns to one of the configs to disambiguate.
+The detector matches on the file's column names. If two transforms both match, `AmbiguousFormatError` is raised — add more source columns to one of the transforms to disambiguate.
 
 ### 5. Validate the output
 

@@ -4,7 +4,7 @@ schemashift ships a `schemashift` CLI command.
 
 ## transform
 
-Apply a config to a file and write the output.
+Apply a transform spec to a file and write the output.
 
 ```bash
 schemashift transform <FILE> [OPTIONS]
@@ -21,16 +21,16 @@ Exactly one of `--config` or `--registry` must be provided.
 **Examples:**
 
 ```bash
-# Explicit config
+# Explicit transform spec
 schemashift transform camstar_mes.csv --config camstar_mes.json --output result.csv
 
 # Auto-detect from registry
-schemashift transform fabx.tsv --registry ./configs/ --output result.parquet
+schemashift transform fabx.tsv --registry ./transforms/ --output result.parquet
 ```
 
 ## validate
 
-Check that a config file is valid — all DSL expressions parse, all required fields are present.
+Check that a transform spec file is valid — all DSL expressions parse, all required fields are present.
 
 ```bash
 schemashift validate <CONFIG>
@@ -54,9 +54,9 @@ schemashift generate <FILE> [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `--dataset-schema PATH` | YAML `DatasetSchema` to generate a config for (required) |
-| `--registry DIR` | Save the generated config here |
-| `--output PATH` | Save the generated config to this specific path |
-| `--interactive` | Review the config before saving |
+| `--registry DIR` | Save the generated transform here |
+| `--output PATH` | Save the generated transform to this specific path |
+| `--interactive` | Review the transform before saving |
 | `--retries N` | LLM retry attempts on validation failure (default: 2) |
 
 ```bash
@@ -65,22 +65,22 @@ schemashift generate sap_erp.csv --dataset-schema schemas/lot_movement.yaml
 
 # Generate and save to registry
 schemashift generate sap_erp.csv \
-    --registry ./configs/ \
+    --registry ./transforms/ \
     --dataset-schema schemas/lot_movement.yaml
 
 # Generate with review step
 schemashift generate sap_erp.csv \
-    --registry ./configs/ \
+    --registry ./transforms/ \
     --dataset-schema schemas/lot_movement.yaml \
     --interactive
 ```
 
 ## list
 
-List all configs registered in a directory.
+List all transforms registered in a directory.
 
 ```bash
-schemashift list --registry ./configs/
+schemashift list --registry ./transforms/
 ```
 
 ```
