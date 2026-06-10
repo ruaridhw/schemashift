@@ -1,6 +1,6 @@
 # Config format reference
 
-A `FormatConfig` is a JSON (or YAML) file that describes how to transform one specific source format into your target schema.
+A `TransformSpec` is a JSON (or YAML) file that describes how to transform one specific source format into your dataset schema.
 
 ## Full structure
 
@@ -9,7 +9,7 @@ A `FormatConfig` is a JSON (or YAML) file that describes how to transform one sp
   "name": "camstar_mes",
   "description": "Camstar MES lot movement export",
   "version": 1,
-  "target_schema": "lot_movement",
+  "schema_name": "lot_movement",
   "reader": {
     "skip_rows": 0,
     "separator": ",",
@@ -18,8 +18,8 @@ A `FormatConfig` is a JSON (or YAML) file that describes how to transform one sp
   "columns": [
     { "target": "lot_id",        "source": "LOT_ID" },
     { "target": "wafer_count",   "source": "QTY", "dtype": "int32" },
-    { "target": "track_in_time", "expr": "col(\"TRACKIN_DT\").str.to_datetime(\"%Y-%m-%d %H:%M:%S\")" },
-    { "target": "hold_flag",     "expr": "col(\"HOLD_STATUS\") != \"NONE\"" },
+    { "target": "track_in_time", "expr": "col('TRACKIN_DT').str.to_datetime('%Y-%m-%d %H:%M:%S')" },
+    { "target": "hold_flag",     "expr": "col('HOLD_STATUS') != 'NONE'" },
     { "target": "data_source",   "constant": "camstar_mes" }
   ],
   "drop_unmapped": true
@@ -29,16 +29,16 @@ A `FormatConfig` is a JSON (or YAML) file that describes how to transform one sp
 ## Top-level fields
 
 `name` _(required)_
-: Unique identifier for this config within the registry. Used by `registry.get()` and for auto-detection.
+: Unique identifier for this transform within the registry. Used by `registry.get()` and for auto-detection.
 
 `description`
-: Optional human-readable description. Included in LLM-generated configs.
+: Optional human-readable description. Included in LLM-generated transforms.
 
 `version`
 : Integer version number. Defaults to `1`.
 
-`target_schema`
-: Name of the `TargetSchema` this config produces. Used for validation.
+`schema_name`
+: Optional name of the `DatasetSchema` this transform targets. Registries can load the referenced schema from their `schemas/` directory; runtime calls can also pass a schema directly with `dataset_schema=...`.
 
 `reader`
 : Optional `ReaderConfig` controlling how the file is read. See [Reader options](#reader-options).
@@ -80,7 +80,7 @@ Broadcasts a literal value to every row.
 ### Common optional fields
 
 `dtype`
-: Cast the result to this Polars dtype after the mapping. Accepted values: `str`, `int32`, `int64`, `float32`, `float64`, `bool`, `date`, `datetime`, `duration`.
+: Cast the result to this Polars dtype after the mapping. Accepted values include `str`, `int32`, `int64`, `float32`, `float64`, `bool`, `date`, `datetime`, `duration`, and JSON Schema primitive aliases `string`, `integer`, `number`, and `boolean`. `array` and `object` are not supported.
 
 `fillna`
 : Fill nulls in the output column with this value after the mapping is applied.
@@ -119,7 +119,7 @@ Use `validate_config()` to check that all DSL expressions parse correctly withou
 ```python
 import schemashift as ss
 
-config = ss.FormatConfig.model_validate_json(open("my_config.json").read())
+config = ss.TransformSpec.model_validate_json(open("my_config.json").read())
 errors = ss.validate_config(config)
 if errors:
     for err in errors:

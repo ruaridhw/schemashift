@@ -1,0 +1,24 @@
+name: bank_statement
+description: Canonical bank statement transactions.
+columns:
+  transaction_id:
+    type: string
+    nullable: false
+  posted_at:
+    type: date
+    nullable: false
+  description:
+    type: string
+    nullable: false
+  amount:
+    type: number
+    nullable: false
+  currency:
+    type: string
+    nullable: false
+  account_id:
+    type: string
+    nullable: false
+  data_source:
+    type: string
+    nullable: false

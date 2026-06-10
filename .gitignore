@@ -13,5 +13,7 @@ dist/
 .idea/
 docs/_build/
 plans/
+docs/superpowers/specs/
+superpowers/specs/
 .gitnexus
 .DS_Store

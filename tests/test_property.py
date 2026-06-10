@@ -13,7 +13,7 @@ from schemashift.dsl import parse_and_compile
 from schemashift.errors import DSLSyntaxError
 from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.transform import transform
-from schemashift.validation import SchemaConfig
+from schemashift.validation import DatasetSchema
 
 # ---------------------------------------------------------------------------
 # Shared strategies
@@ -251,11 +251,11 @@ class TestConstantMappingRowCounts:
 
 
 # ---------------------------------------------------------------------------
-# 6. SchemaConfig YAML round-trip
+# 6. DatasetSchema YAML round-trip
 # ---------------------------------------------------------------------------
 
 
-class TestSchemaConfigYamlRoundtrip:
+class TestDatasetSchemaYamlRoundtrip:
     @given(
         col_names=st.lists(
             st.text(
@@ -281,7 +281,7 @@ class TestSchemaConfigYamlRoundtrip:
         with open(path, "w") as f:
             yaml.safe_dump(schema_data, f, sort_keys=False)
 
-        schema = SchemaConfig.from_yaml(path)
+        schema = DatasetSchema.from_yaml(path)
         assert schema.name == "test_schema"
         assert list(schema.columns.keys()) == col_names
 
@@ -309,6 +309,6 @@ class TestSchemaConfigYamlRoundtrip:
         with open(path, "w") as f:
             yaml.safe_dump(schema_data, f, sort_keys=False)
 
-        schema = SchemaConfig.from_yaml(path)
+        schema = DatasetSchema.from_yaml(path)
         non_nullable = [name for name, c in schema.columns.items() if not c.nullable]
         assert non_nullable == col_names

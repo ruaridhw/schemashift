@@ -5,6 +5,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from schemashift.dtypes import polars_dtype
 from schemashift.errors import ConfigValidationError
 from schemashift.models import ColumnMapping, ReaderConfig, TransformSpec
 
@@ -78,18 +79,22 @@ class TestColumnMappingDtypeValidation:
         "dtype",
         [
             "str",
+            "string",
             "utf8",
             "float32",
             "float64",
+            "number",
             "int8",
             "int16",
             "int32",
             "int64",
+            "integer",
             "uint8",
             "uint16",
             "uint32",
             "uint64",
             "bool",
+            "boolean",
             "date",
             "datetime",
             "time",
@@ -102,6 +107,24 @@ class TestColumnMappingDtypeValidation:
     def test_valid_dtype_accepted(self, dtype):
         col = ColumnMapping(target="out", source="in", dtype=dtype)
         assert col.dtype == dtype
+
+    @pytest.mark.parametrize(
+        ("dtype", "polars_name"),
+        [
+            ("string", "String"),
+            ("integer", "Int64"),
+            ("number", "Float64"),
+            ("boolean", "Boolean"),
+            ("null", "Null"),
+        ],
+    )
+    def test_json_schema_dtype_aliases_map_to_polars_types(self, dtype, polars_name):
+        assert polars_dtype(dtype).__name__ == polars_name
+
+    @pytest.mark.parametrize("dtype", ["array", "object"])
+    def test_json_schema_container_types_are_not_supported(self, dtype):
+        with pytest.raises(ValidationError):
+            ColumnMapping(target="out", source="in", dtype=dtype)
 
     def test_invalid_dtype_raises_validation_error(self):
         with pytest.raises(ValidationError):
@@ -250,20 +273,30 @@ class TestTransformSpecJsonRoundTrip:
 
 
 # ---------------------------------------------------------------------------
-# TransformSpec.output_schema
+# TransformSpec.schema_name
 # ---------------------------------------------------------------------------
 
 
-class TestTransformSpecOutputSchema:
+class TestTransformSpecSchemaName:
     def _minimal_columns(self) -> list[dict]:
         return [{"target": "out", "source": "in"}]
 
-    def test_output_schema_defaults_to_none(self) -> None:
+    def test_schema_name_defaults_to_none(self) -> None:
         cfg = TransformSpec(name="test", columns=self._minimal_columns())
-        assert cfg.output_schema is None
+        assert cfg.schema_name is None
 
-    def test_output_schema_none_round_trips_json(self) -> None:
-        original = TransformSpec(name="test", columns=self._minimal_columns())
+    def test_schema_name_round_trips_json(self) -> None:
+        original = TransformSpec(name="test", schema_name="bank_statement", columns=self._minimal_columns())
         data = original.model_dump()
         restored = TransformSpec.model_validate(data)
-        assert restored.output_schema is None
+        assert restored.schema_name == "bank_statement"
+
+    def test_inline_dataset_schema_is_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            TransformSpec.model_validate(
+                {
+                    "name": "test",
+                    "dataset_schema": {"name": "bank_statement", "columns": {}},
+                    "columns": self._minimal_columns(),
+                }
+            )

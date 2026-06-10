@@ -7,7 +7,7 @@ from pathlib import Path
 
 from schemashift.errors import ConfigValidationError
 from schemashift.models import TransformSpec
-from schemashift.validation import SchemaConfig
+from schemashift.validation import DatasetSchema
 
 
 class Registry(ABC):
@@ -32,8 +32,8 @@ class Registry(ABC):
         Returns True if the config existed and was removed, False otherwise.
         """
 
-    def load_schema(self, name: str | None = None) -> SchemaConfig | None:
-        """Load a schema config associated with this registry, if supported."""
+    def load_dataset_schema(self, name: str | None = None) -> DatasetSchema | None:
+        """Load a dataset schema associated with this registry, if supported."""
         return None
 
 
@@ -104,8 +104,8 @@ class FileSystemRegistry(Registry):
             return True
         return False
 
-    def load_schema(self, name: str | None = None) -> SchemaConfig | None:
-        """Load a SchemaConfig from the schemas/ subdirectory.
+    def load_dataset_schema(self, name: str | None = None) -> DatasetSchema | None:
+        """Load a DatasetSchema from the schemas/ subdirectory.
 
         If *name* is provided, loads ``{schemas_dir}/{name}.yaml`` (falling
         back to ``.yml``).  If *name* is ``None`` and exactly one schema file
@@ -115,14 +115,14 @@ class FileSystemRegistry(Registry):
         Raises:
             ValueError: If multiple schemas exist and no explicit name is given.
         """
-        path = _resolve_schema_path(self._path / "schemas", name)
+        path = _resolve_dataset_schema_path(self._path / "schemas", name)
         if path is None:
             return None
-        return SchemaConfig.from_yaml(path)
+        return DatasetSchema.from_yaml(path)
 
 
-def _resolve_schema_path(schemas_dir: Path, name: str | None = None) -> Path | None:
-    """Resolve a schema file path inside a ``schemas`` directory."""
+def _resolve_dataset_schema_path(schemas_dir: Path, name: str | None = None) -> Path | None:
+    """Resolve a dataset schema file path inside a ``schemas`` directory."""
     if not schemas_dir.exists():
         return None
 

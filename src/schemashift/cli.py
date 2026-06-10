@@ -9,7 +9,7 @@ import click
 import polars as pl
 
 if TYPE_CHECKING:
-    from schemashift.validation import SchemaConfig
+    from schemashift.validation import DatasetSchema
 
 from schemashift.errors import (
     AmbiguousFormatError,
@@ -92,9 +92,9 @@ def validate(config_path: Path) -> None:
 @cli.command()
 @click.argument("file")
 @click.option(
-    "--target-schema",
+    "--dataset-schema",
     "-t",
-    help="Path to target schema YAML. If omitted, looks in --registry/schemas/",
+    help="Path to dataset schema YAML. If omitted, looks in --registry/schemas/",
 )
 @click.option("--output", "-o", help="Output path for generated config JSON.")
 @click.option("--registry", "-r", help="Registry directory (auto-register if provided).")
@@ -115,7 +115,7 @@ def validate(config_path: Path) -> None:
 )
 def generate(
     file: str,
-    target_schema: str | None,
+    dataset_schema: str | None,
     output: str | None,
     registry: str | None,
     name: str | None,
@@ -130,7 +130,7 @@ def generate(
     """
     try:
         file_path = Path(file)
-        schema = _resolve_schema(target_schema, registry)
+        resolved_dataset_schema = _resolve_dataset_schema(dataset_schema, registry)
 
         # Try to load LangChain LLM from environment
         llm = _load_default_llm()
@@ -139,7 +139,7 @@ def generate(
 
         config = generate_config(
             path=file_path,
-            target_schema=schema,
+            dataset_schema=resolved_dataset_schema,
             llm=llm,
             format_name=name,
             n_sample_rows=rows,
@@ -211,28 +211,28 @@ def list_configs(registry: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_schema(target_schema_path: str | None, registry_path: str | None) -> "SchemaConfig":
-    """Resolve a SchemaConfig from an explicit path or a registry schemas/ dir.
+def _resolve_dataset_schema(dataset_schema_path: str | None, registry_path: str | None) -> "DatasetSchema":
+    """Resolve a DatasetSchema from an explicit path or a registry schemas/ dir.
 
     Resolution order:
-    1. If *target_schema_path* is given, load it directly.
-    2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_schema`.
+    1. If *dataset_schema_path* is given, load it directly.
+    2. If *registry_path* is given, delegate to :meth:`FileSystemRegistry.load_dataset_schema`.
     3. Otherwise raise :class:`click.UsageError`.
     """
-    from schemashift.validation import SchemaConfig  # noqa: PLC0415
+    from schemashift.validation import DatasetSchema  # noqa: PLC0415
 
-    if target_schema_path is not None:
-        return SchemaConfig.from_yaml(Path(target_schema_path))
+    if dataset_schema_path is not None:
+        return DatasetSchema.from_yaml(Path(dataset_schema_path))
 
     if registry_path is not None:
         try:
-            schema = FileSystemRegistry(Path(registry_path)).load_schema()
+            dataset_schema = FileSystemRegistry(Path(registry_path)).load_dataset_schema()
         except ValueError as exc:
             raise click.UsageError(str(exc)) from exc
-        if schema is not None:
-            return schema
+        if dataset_schema is not None:
+            return dataset_schema
 
-    raise click.UsageError("Provide --target-schema or --registry with a schemas/ subdirectory.")
+    raise click.UsageError("Provide --dataset-schema or --registry with a schemas/ subdirectory.")
 
 
 def _load_default_llm() -> Any:

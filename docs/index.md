@@ -5,19 +5,19 @@ those systems export whatever they want: third-party flat files, formats you've 
 and arbitrary Excel workbooks. Wiring each one up by hand means bespoke pandas or Polars code for
 every integration, every time.
 
-**schemashift** solves this with a **declarative config format** and a **safe expression DSL** designed
+**schemashift** solves this with a **declarative transform format** and a **safe expression DSL** designed
 around three goals:
 
 1. **Robustness** — strong types, schema validation, and end-to-end checks catch problems before data
    reaches your application.
 2. **LLM-friendly syntax** — the DSL mirrors Polars expressions but is a closed language with no
-   arbitrary code. An LLM can write a correct transformation in one shot, with (ideally) far fewer tokens than
+   arbitrary code. An LLM can write a correct transform in one shot, with (ideally) far fewer tokens than
    generating pure Python, and the result is always safe to execute.
-3. **Similarity-aware** — transformations are structured definitions, so similarity analysis against existing
-   configs is straightforward, thereby saving time and tokens when an almost-familiar format reappears.
+3. **Similarity-aware** — transforms are structured definitions, so similarity analysis against existing
+   specs is straightforward, thereby saving time and tokens when an almost-familiar format reappears.
 
-When a new format arrives with no matching config, `smart_transform()` sends the file headers and your
-target schema to your LLM, validates the generated config end-to-end, and saves it to the registry
+When a new format arrives with no matching transform, `smart_transform()` sends the file headers and your
+dataset schema to your LLM, validates the generated transform end-to-end, and saves it to the registry
 so the next run is instant.
 
 ---
@@ -30,75 +30,86 @@ This is your canonical "result" format that you only need to define once per dat
 In the future `type` may also be various `Enum`s that you define or other custom types.
 
 ```yaml
-# schemas/lot_movement.yaml
-name: lot_movement
+# examples/schemas/bank_statement.yaml
+name: bank_statement
 columns:
-  - name: lot_id
-    type: str
-    required: true
-  - name: wafer_count
-    type: int32
-    required: true
-  - name: operation
-    type: str
-    required: true
-  - name: track_in_time
-    type: datetime
-    required: true
-  - name: hold_flag
-    type: bool
-    required: true
-  - name: data_source
-    type: str
-    required: true
+  transaction_id:
+    type: string
+    nullable: false
+  posted_at:
+    type: date
+    nullable: false
+  description:
+    type: string
+    nullable: false
+  amount:
+    type: number
+    nullable: false
+  currency:
+    type: string
+    nullable: false
+  account_id:
+    type: string
+    nullable: false
+  data_source:
+    type: string
+    nullable: false
 ```
 
-**2. Write a config for one source format:**
+**2. Write a transform for one source format:**
 
-This is the definition of how we get from a given input format to the result you defined above.
+Riverbank provides debit and credit columns separately:
 
 ```json
 {
-  "name": "camstar_mes",
+  "name": "riverbank_statement",
+  "description": "Riverbank current account statement export",
+  "schema_name": "bank_statement",
   "columns": [
-    { "target": "lot_id",        "source": "LOT_ID" },
-    { "target": "wafer_count",   "source": "QTY", "dtype": "int32" },
-    { "target": "operation",     "source": "CURRENT_OPER" },
-    { "target": "track_in_time", "expr": "col(\"TRACKIN_DT\").str.to_datetime(\"%Y-%m-%d %H:%M:%S\")" },
-    { "target": "hold_flag",     "expr": "col(\"HOLD_STATUS\") != \"NONE\"" },
-    { "target": "data_source",   "constant": "camstar_mes" }
+    { "target": "transaction_id", "source": "Ref" },
+    { "target": "posted_at", "expr": "col('Date').str.to_datetime('%Y-%m-%d')", "dtype": "date" },
+    { "target": "description", "source": "Details" },
+    {
+      "target": "amount",
+      "expr": "col('Credit').cast('float64').fill_null(0) - col('Debit').cast('float64').fill_null(0)",
+      "dtype": "number"
+    },
+    { "target": "currency", "constant": "GBP" },
+    { "target": "account_id", "constant": "RIVER-001" },
+    { "target": "data_source", "constant": "riverbank" }
   ]
 }
 ```
 
-The point is that JSON configs are simple enough for an LLM to infer, write, and validate — and executing the result is a single tool call.
+The point is that JSON transforms are simple enough for an LLM to infer, write, and validate — and executing the result is a single tool call.
 
 **3. Transform:**
 
 ```python
 import schemashift as ss
 
-registry = ss.FileSystemRegistry("./configs/")
-df = ss.smart_transform("camstar_mes.csv", registry=registry)
+registry = ss.FileSystemRegistry("./examples/transforms/")
+schema = ss.DatasetSchema.from_yaml("examples/schemas/bank_statement.yaml")
+result = ss.smart_transform("riverbank_statement.csv", registry=registry, dataset_schema=schema)
 ```
 
 ## When a new format arrives
 
-If the transformation is saved to the Registry, it gets instantly re-loaded.
-Otherwise, if an LLM is provided, it will be used to generate the transformation and save it for next time.
+If the transform is saved to the Registry, it gets instantly re-loaded.
+Otherwise, if an LLM is provided, it will be used to generate the transform and save it for next time.
 
 ```python
 from langchain_anthropic import ChatAnthropic
 
-schema = ss.TargetSchema.from_yaml("schemas/lot_movement.yaml")
+schema = ss.DatasetSchema.from_yaml("examples/schemas/bank_statement.yaml")
 llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
-df = ss.smart_transform(
-    "fabx.tsv",
+result = ss.smart_transform(
+    "metro_credit_statement.tsv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
-    auto_register=True,   # saves the config so next run hits the registry
+    auto_register=True,   # saves the transform so next run hits the registry
 )
 ```
 
@@ -110,24 +121,24 @@ df = ss.smart_transform(
 :link: getting-started
 :link-type: doc
 
-Register a config once per source. Call `transform()` to apply it — returns a
-`polars.DataFrame`. Pass `n_rows=N` to preview without reading the full file.
+Register a transform once per source. Call `transform()` to apply it — returns a
+`TransformResult` with valid rows and failure details. Pass `n_rows=N` to preview without reading the full file.
 :::
 
 :::{grid-item-card} Auto-detect from a registry
 :link: getting-started
 :link-type: doc
 
-Point schemashift at a directory of configs and a file. The detector matches on column fingerprints
-and picks the right config — or raises `AmbiguousFormatError` when the match is ambiguous.
+Point schemashift at a directory of transforms and a file. The detector matches on column fingerprints
+and picks the right transform — or raises `AmbiguousFormatError` when the match is ambiguous.
 :::
 
 :::{grid-item-card} LLM-assisted generation
 :link: user-guide/llm-generation
 :link-type: doc
 
-Unknown format? `smart_transform()` sends the file headers and target schema to your LLM, validates
-the generated config end-to-end, and optionally saves it to the registry for next time.
+Unknown format? `smart_transform()` sends the file headers and dataset schema to your LLM, validates
+the generated transform end-to-end, and optionally saves it to the registry for next time.
 :::
 
 ::::

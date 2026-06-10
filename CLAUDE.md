@@ -28,7 +28,7 @@ pre-commit run                                 # lint + format (run after stagin
 
 ## Architecture
 
-schemashift transforms tabular files into a canonical schema using declarative JSON/YAML configs. The pipeline is:
+schemashift transforms tabular files into validated datasets using declarative JSON/YAML configs. The pipeline is:
 
 ```
 File → Reader → LazyFrame → Transform Engine → DataFrame
@@ -40,12 +40,12 @@ File → Reader → LazyFrame → Transform Engine → DataFrame
 
 ### Config model (`models.py`)
 
-`FormatConfig` is the central object. Each `ColumnMapping` must have **exactly one** of:
+`TransformSpec` is the central object. Each `ColumnMapping` must have **exactly one** of:
 - `source` — rename a column
 - `expr` — DSL expression string (compiled at transform time)
 - `constant` — literal value broadcast to all rows
 
-`FormatConfig.source_columns()` extracts referenced source column names (used by the detector).
+`TransformSpec.source_columns()` extracts referenced source column names (used by the detector).
 
 ### DSL (`dsl/`)
 
@@ -54,7 +54,7 @@ Three-layer pipeline: string → AST → `polars.Expr`.
 - `parser.py` — hand-written recursive descent. Allowlist of methods in `_STR_METHODS`, `_DT_METHODS`, `_DIRECT_METHODS`. Add new ops here first.
 - `ast_nodes.py` — frozen dataclasses (`ColRef`, `BinaryOp`, `MethodCall`, `WhenChain`, `Coalesce`, etc.)
 - `compiler.py` — `compile_dsl()` uses `match/case` to dispatch each node type to a `polars.Expr`. dtype string→Polars type mapping lives in `dtypes.py` as `DTYPE_MAP`.
-- `analysis.py` — `collect_col_refs()` walks an AST to extract all referenced column names. Used by `FormatConfig.source_columns()`.
+- `analysis.py` — `collect_col_refs()` walks an AST to extract all referenced column names. Used by `TransformSpec.source_columns()`.
 - `_lookups.py` — auto-discovers JSON files in `dsl/tables/` and exposes them as the `TABLES` dict (used by `lookup()` / `custom_lookup()` DSL ops).
 
 To add a new DSL operation: add to the allowlist in `parser.py`, add a case in `compiler.py`, add to `_DSL_REFERENCE` in `llm.py`.
@@ -77,15 +77,15 @@ Higher-level flows built on top of the core transform engine.
 
 ### Registry (`registry.py`)
 
-`DictRegistry` (in-memory) and `FileSystemRegistry` (JSON files per config in a directory). `FileSystemRegistry.load_schema()` looks for a `TargetSchema` in a `schemas/` subdirectory — convention used by the CLI.
+`DictRegistry` (in-memory) and `FileSystemRegistry` (JSON files per config in a directory). `FileSystemRegistry.load_dataset_schema()` looks for a `DatasetSchema` in a `schemas/` subdirectory — convention used by the CLI.
 
 ### LLM generation (`llm.py`)
 
-`generate_config()` accepts any `LLMBackend` implementation; plain LangChain `BaseChatModel` instances are auto-wrapped in `LangChainLLMBackend`. Retry loop (default 2 retries): extract JSON → `FormatConfig.model_validate` → `validate_config` (DSL parse check) → `transform(n_rows=5)`. Each failed attempt is logged at `WARNING` and stored in `LLMGenerationError.attempts`.
+`generate_config()` accepts any `LLMBackend` implementation; plain LangChain `BaseChatModel` instances are auto-wrapped in `LangChainLLMBackend`. Retry loop (default 2 retries): extract JSON → `TransformSpec.model_validate` → `validate_config` (DSL parse check) → `transform(n_rows=5)`. Each failed attempt is logged at `WARNING` and stored in `LLMGenerationError.attempts`.
 
-### Target schema (`target_schema.py`)
+### Dataset schema (`validation.py`)
 
-`TargetSchema` is the source of truth for output shape. `validate_lazy()` checks column names/dtypes against the internal `LazyFrame` before collection (used by `smart_transform`). `validate_eager()` also checks for nulls in required columns.
+`DatasetSchema` is the declarative validation contract for the transformed dataset. `build_dy_schema()` converts it into a `dataframely.dy.Schema`; `resolve_dataset_schema()` accepts either a `DatasetSchema` or a custom `dy.Schema` subclass.
 
 ### Error hierarchy
 
@@ -97,14 +97,14 @@ All errors inherit from `SchemaShiftError`. Full list:
 - `ReviewRejectedError` — raised when a `review_fn` rejects a generated config
 - `LLMGenerationError` — has `.attempts` (list of failed attempt dicts)
 - `ConfigValidationError` — invalid config structure
-- `SchemaValidationError` — output shape doesn't match `TargetSchema`
+- `SchemaValidationError` — transformed rows do not conform to the `DatasetSchema`
 - `UnsupportedFileError` — unrecognised file extension
 - `ReaderError` — file read failure
 
 ## Key design constraints
 
 - The transform engine only ever sees a `pl.LazyFrame` — format-specific logic stays in `readers.py`.
-- `TargetSchema` validates the *output* of a config, not the config itself. A syntactically valid config can still produce schema-failing output.
+- `DatasetSchema` validates the *output* of a config, not the config itself. A syntactically valid config can still produce schema-failing output.
 - Excel files use `fastexcel` (calamine engine). Integer `sheet_name` values are passed as `sheet_id` (1-based) not `sheet_name`.
 - Unix timestamp → Polars `Datetime` requires multiplying by `1_000_000` (microseconds), not nanoseconds.
 

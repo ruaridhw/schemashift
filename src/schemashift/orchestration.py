@@ -4,7 +4,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import dataframely as dy
 import polars as pl
 
 from schemashift.errors import FormatDetectionError, ReviewRejectedError
@@ -13,7 +12,7 @@ from schemashift.readers import read_header
 from schemashift.registry import Registry
 from schemashift.result import TransformResult
 from schemashift.transform import transform
-from schemashift.validation import SchemaConfig
+from schemashift.validation import DatasetSchema
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -22,8 +21,7 @@ if TYPE_CHECKING:
 def smart_transform(
     path: Path,
     registry: Registry,
-    target_schema: SchemaConfig | None = None,
-    schema: SchemaConfig | type[dy.Schema] | None = None,
+    dataset_schema: DatasetSchema | None = None,
     llm: "BaseChatModel | None" = None,
     review_fn: Callable[[TransformSpec, pl.DataFrame], TransformSpec | None] | None = None,
     auto_register: bool = False,
@@ -40,13 +38,12 @@ def smart_transform(
     2. If miss and LLM available: generate config.
     3. If review_fn provided: pass config + sample to reviewer.
     4. If auto_register: save to registry.
-    5. Apply config and validate against schema.
+    5. Apply config and validate against the dataset schema.
 
     Args:
         path: Source file path.
         registry: Registry to search and optionally register to.
-        target_schema: Deprecated. Use ``schema`` instead.
-        schema: Output schema for validation.
+        dataset_schema: Dataset schema for generation and validation.
         llm: LangChain BaseChatModel.
         review_fn: callback(config, sample_df) -> config | None. None = reject.
         auto_register: Register LLM-generated config automatically.
@@ -61,7 +58,7 @@ def smart_transform(
 
     Raises:
         FormatDetectionError: No match and no LLM.
-        ValueError: LLM needed but target_schema not provided.
+        ValueError: LLM needed but dataset_schema not provided.
         LLMGenerationError: LLM fails after all retries.
         ReviewRejectedError: review_fn returned None.
         SchemaValidationError: When *strict* is True and validation fails.
@@ -69,7 +66,7 @@ def smart_transform(
     config = _resolve_config(
         path=path,
         registry=registry,
-        target_schema=target_schema,
+        dataset_schema=dataset_schema,
         llm=llm,
         review_fn=review_fn,
         auto_register=auto_register,
@@ -78,7 +75,10 @@ def smart_transform(
         n_sample_rows=n_sample_rows,
         reader_config=reader_config,
     )
-    return transform(path, config, schema=schema, strict=strict)
+    resolved_dataset_schema = dataset_schema
+    if resolved_dataset_schema is None and config.schema_name is not None:
+        resolved_dataset_schema = registry.load_dataset_schema(config.schema_name)
+    return transform(path, config, dataset_schema=resolved_dataset_schema, strict=strict)
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ def _detect_config(
 def _resolve_config(
     path: Path,
     registry: Registry,
-    target_schema: SchemaConfig | None,
+    dataset_schema: DatasetSchema | None,
     llm: "BaseChatModel | None",
     review_fn: Callable[[TransformSpec, pl.DataFrame], TransformSpec | None] | None,
     auto_register: bool,
@@ -117,14 +117,14 @@ def _resolve_config(
         raise FormatDetectionError(
             f"No registered config matches '{path}' and no LLM is configured. File columns: {columns}"
         )
-    if target_schema is None:
-        raise ValueError("target_schema is required for LLM config generation")
+    if dataset_schema is None:
+        raise ValueError("dataset_schema is required for LLM config generation")
 
     from schemashift.llm import generate_config  # noqa: PLC0415
 
     generated = generate_config(
         path=path,
-        target_schema=target_schema,
+        dataset_schema=dataset_schema,
         llm=llm,
         example_configs=example_configs,
         max_retries=max_retries,

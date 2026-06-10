@@ -9,7 +9,7 @@ import polars as pl
 import pytest
 from click.testing import CliRunner
 
-from schemashift.cli import _resolve_schema, cli
+from schemashift.cli import _resolve_dataset_schema, cli
 from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.registry import FileSystemRegistry
 
@@ -145,12 +145,12 @@ class TestTransformCommand:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_schema helper
+# _resolve_dataset_schema helper
 # ---------------------------------------------------------------------------
 
 SAMPLE_SCHEMA_YAML = """\
 name: test_schema
-description: Test target schema
+description: Test dataset schema
 columns:
   id:
     type: str
@@ -166,7 +166,7 @@ class TestResolveSchema:
         schema_file = tmp_path / "my_schema.yaml"
         schema_file.write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
 
-        schema = _resolve_schema(str(schema_file), None)
+        schema = _resolve_dataset_schema(str(schema_file), None)
 
         assert schema.name == "test_schema"
         assert len(schema.columns) == 2
@@ -176,7 +176,7 @@ class TestResolveSchema:
         schemas_dir.mkdir()
         (schemas_dir / "my_schema.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
 
-        schema = _resolve_schema(None, str(tmp_path))
+        schema = _resolve_dataset_schema(None, str(tmp_path))
 
         assert schema.name == "test_schema"
 
@@ -185,7 +185,7 @@ class TestResolveSchema:
         schemas_dir.mkdir()
         (schemas_dir / "my_schema.yml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
 
-        schema = _resolve_schema(None, str(tmp_path))
+        schema = _resolve_dataset_schema(None, str(tmp_path))
 
         assert schema.name == "test_schema"
 
@@ -196,16 +196,16 @@ class TestResolveSchema:
         (schemas_dir / "schema_b.yaml").write_text(SAMPLE_SCHEMA_YAML, encoding="utf-8")
 
         with pytest.raises(click.UsageError, match="Multiple schemas found"):
-            _resolve_schema(None, str(tmp_path))
+            _resolve_dataset_schema(None, str(tmp_path))
 
     def test_registry_no_schemas_dir_raises_usage_error(self, tmp_path: Path) -> None:
         # tmp_path has no schemas/ subdirectory
-        with pytest.raises(click.UsageError, match="Provide --target-schema"):
-            _resolve_schema(None, str(tmp_path))
+        with pytest.raises(click.UsageError, match="Provide --dataset-schema"):
+            _resolve_dataset_schema(None, str(tmp_path))
 
     def test_no_args_raises_usage_error(self) -> None:
-        with pytest.raises(click.UsageError, match="Provide --target-schema"):
-            _resolve_schema(None, None)
+        with pytest.raises(click.UsageError, match="Provide --dataset-schema"):
+            _resolve_dataset_schema(None, None)
 
     def test_explicit_path_takes_precedence_over_registry(self, tmp_path: Path) -> None:
         schema_file = tmp_path / "explicit.yaml"
@@ -224,7 +224,7 @@ columns:
 """
         (schemas_dir / "other.yaml").write_text(other_yaml, encoding="utf-8")
 
-        schema = _resolve_schema(str(schema_file), str(tmp_path))
+        schema = _resolve_dataset_schema(str(schema_file), str(tmp_path))
 
         assert schema.name == "test_schema"
 
@@ -269,7 +269,7 @@ class TestGenerateCommand:
         ):
             result = runner.invoke(
                 cli,
-                ["generate", SAMPLE_CSV, "--target-schema", str(schema_file)],
+                ["generate", SAMPLE_CSV, "--dataset-schema", str(schema_file)],
             )
 
         assert result.exit_code == 0, result.output
@@ -317,7 +317,7 @@ class TestGenerateCommand:
                 [
                     "generate",
                     SAMPLE_CSV,
-                    "--target-schema",
+                    "--dataset-schema",
                     str(schema_file),
                     "--output",
                     str(out_file),
@@ -348,7 +348,7 @@ class TestGenerateCommand:
                 [
                     "generate",
                     SAMPLE_CSV,
-                    "--target-schema",
+                    "--dataset-schema",
                     str(schema_file),
                     "--registry",
                     str(reg_dir),
@@ -374,7 +374,7 @@ class TestGenerateCommand:
         ):
             result = runner.invoke(
                 cli,
-                ["generate", SAMPLE_CSV, "--target-schema", str(schema_file), "--interactive"],
+                ["generate", SAMPLE_CSV, "--dataset-schema", str(schema_file), "--interactive"],
                 input="y\n",
             )
 
@@ -398,7 +398,7 @@ class TestGenerateCommand:
         ):
             result = runner.invoke(
                 cli,
-                ["generate", SAMPLE_CSV, "--target-schema", str(schema_file), "--interactive"],
+                ["generate", SAMPLE_CSV, "--dataset-schema", str(schema_file), "--interactive"],
                 input="n\n",
             )
 

@@ -1,15 +1,15 @@
-# LLM-assisted config generation
+# LLM-assisted transform generation
 
-When a file arrives from a source you have no config for, `smart_transform()` can generate one automatically using a language model.
+When a file arrives from a source you have no transform for, `smart_transform()` can generate one automatically using a language model.
 
 ## How it works
 
 1. schemashift reads the file headers and a small sample (default 5 rows)
-2. Sends them to your LLM along with the target schema and the DSL reference
-3. The LLM returns a `FormatConfig` as JSON
-4. schemashift validates the config: parses all DSL expressions, transforms the sample rows
+2. Sends them to your LLM along with the dataset schema and the DSL reference
+3. The LLM returns a `TransformSpec` as JSON
+4. schemashift validates the transform: parses all DSL expressions, transforms the sample rows
 5. On failure, retries up to N times (default 2) with the error appended to the prompt
-6. On success, optionally saves the config to the registry
+6. On success, optionally saves the transform to the registry
 
 ## Installation
 
@@ -55,27 +55,27 @@ Or via environment variables (`FOUNDRY_API_KEY` + `FOUNDRY_RESOURCE`).
 import schemashift as ss
 from langchain_anthropic import ChatAnthropic
 
-schema = ss.TargetSchema.from_yaml("schemas/lot_movement.yaml")
-registry = ss.FileSystemRegistry("./configs/")
+schema = ss.DatasetSchema.from_yaml("schemas/lot_movement.yaml")
+registry = ss.FileSystemRegistry("./transforms/")
 llm = ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0)
 
 result = ss.smart_transform(
     "sap_erp.csv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
-    auto_register=True,  # saves the config so next run hits the registry
+    auto_register=True,  # saves the transform so next run hits the registry
 )
 ```
 
-If the file matches an existing config in the registry, `smart_transform()` uses it directly — the LLM is only called on a miss.
+If the file matches an existing transform in the registry, `smart_transform()` uses it directly — the LLM is only called on a miss.
 
 ## Human review step
 
-Pass a `review_fn` to inspect and optionally edit the generated config before it's applied:
+Pass a `review_fn` to inspect and optionally edit the generated transform before it's applied:
 
 ```python
-def review(config: ss.FormatConfig, sample_df) -> ss.FormatConfig | None:
+def review(config: ss.TransformSpec, sample_df) -> ss.TransformSpec | None:
     print(config.model_dump_json(indent=2))
     print(sample_df)
     # return config to accept, return None to reject
@@ -84,23 +84,23 @@ def review(config: ss.FormatConfig, sample_df) -> ss.FormatConfig | None:
 result = ss.smart_transform(
     "sap_erp.csv",
     registry=registry,
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     review_fn=review,
     auto_register=True,
 )
 ```
 
-## Generating a config without transforming
+## Generating a transform without transforming
 
-If you want only the config (e.g. to store it or inspect it before use):
+If you want only the transform spec (e.g. to store it or inspect it before use):
 
 ```python
 from schemashift.llm import generate_config
 
 config = generate_config(
     path="sap_erp.csv",
-    target_schema=schema,
+    dataset_schema=schema,
     llm=llm,
     max_retries=3,
 )
@@ -125,18 +125,18 @@ except LLMGenerationError as e:
 ## CLI
 
 ```bash
-# Generate a config and print it
-schemashift generate data.csv --target-schema schemas/lot_movement.yaml
+# Generate a transform and print it
+schemashift generate data.csv --dataset-schema schemas/lot_movement.yaml
 
 # Generate and save to the registry
 schemashift generate data.csv \
-    --registry ./configs/ \
-    --target-schema schemas/lot_movement.yaml
+    --registry ./transforms/ \
+    --dataset-schema schemas/lot_movement.yaml
 
 # Generate with interactive review before saving
 schemashift generate data.csv \
-    --registry ./configs/ \
-    --target-schema schemas/lot_movement.yaml \
+    --registry ./transforms/ \
+    --dataset-schema schemas/lot_movement.yaml \
     --interactive
 ```
 

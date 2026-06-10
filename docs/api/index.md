@@ -6,7 +6,7 @@ All public symbols are importable from the top-level `schemashift` package:
 import schemashift as ss
 
 ss.transform(...)
-ss.FormatConfig(...)
+ss.TransformSpec(...)
 ss.FileSystemRegistry(...)
 ```
 
@@ -32,10 +32,10 @@ dsl
 - {py:func}`schemashift.read_file`
 
 ### Config models
-- {py:class}`schemashift.FormatConfig`
+- {py:class}`schemashift.TransformSpec`
 - {py:class}`schemashift.ColumnMapping`
 - {py:class}`schemashift.ReaderConfig`
-- {py:class}`schemashift.TargetSchema`
+- {py:class}`schemashift.DatasetSchema`
 
 ### Registries
 - {py:class}`schemashift.Registry`

@@ -1,0 +1,17 @@
+{
+  "name": "metro_credit_statement",
+  "description": "Metro Credit card statement export",
+  "schema_name": "bank_statement",
+  "reader": {
+    "separator": "\t"
+  },
+  "columns": [
+    { "target": "transaction_id", "source": "TxnID" },
+    { "target": "posted_at", "expr": "col('Posted').str.to_datetime('%d/%m/%Y')", "dtype": "date" },
+    { "target": "description", "source": "Narrative" },
+    { "target": "amount", "source": "Amount", "dtype": "number" },
+    { "target": "currency", "source": "Currency" },
+    { "target": "account_id", "source": "Account" },
+    { "target": "data_source", "constant": "metro_credit" }
+  ]
+}

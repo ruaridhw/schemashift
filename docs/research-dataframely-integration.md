@@ -4,11 +4,11 @@ Date: 2026-04-11
 
 ## Part 1: Current SchemaShift Architecture
 
-### Validation Approach (TargetSchema)
+### Validation Approach (DatasetSchema)
 
-**File:** `src/schemashift/target_schema.py`
+**File:** `src/schemashift/dataset_schema.py`
 
-`TargetSchema` is a pydantic model containing:
+`DatasetSchema` is a pydantic model containing:
 - `name`: Schema identifier
 - `description`: Human-readable description
 - `columns`: List of `TargetColumn` objects (each with `name`, `type`, `required`, `description`)
@@ -47,8 +47,8 @@ ColumnMapping → pl.Expr:
 **ReaderConfig:**
 - `skip_rows`, `sheet_name`, `separator`, `encoding`
 
-**FormatConfig:**
-- `name`, `description`, `version`, `target_schema`, `reader`, `columns`, `drop_unmapped`
+**TransformSpec:**
+- `name`, `description`, `version`, `schema_name`, `reader`, `columns`, `drop_unmapped`
 - `source_columns()` extracts all referenced source column names
 
 ### Error Hierarchy
@@ -192,11 +192,11 @@ deserialize_schema(json)           # Reconstruct from JSON
 
 | Aspect | SchemaShift (current) | Dataframely |
 |---|---|---|
-| Schema definition | Pydantic model (`TargetSchema`) | Class-based (`dy.Schema`) |
+| Schema definition | Pydantic model (`DatasetSchema`) | Class-based (`dy.Schema`) |
 | Validation granularity | Column-level (aggregated) | Row-level + column-level |
 | Row-level failure details | None | Full (`FailureInfo`) |
 | Constraint types | Name + dtype + nullability only | Rich (min/max, regex, length, custom rules) |
-| Serialisation | JSON/YAML (FormatConfig) | JSON (schema.serialise()) |
+| Serialisation | JSON/YAML (TransformSpec) | JSON (schema.serialise()) |
 | Custom rules | None | `@rule` decorator with Polars exprs |
 | Transformation | Full DSL → Polars expr pipeline | Not in scope |
 | Format detection | Registry + LLM | Not in scope |

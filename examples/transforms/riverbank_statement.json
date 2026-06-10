@@ -1,0 +1,18 @@
+{
+  "name": "riverbank_statement",
+  "description": "Riverbank current account statement export",
+  "schema_name": "bank_statement",
+  "columns": [
+    { "target": "transaction_id", "source": "Ref" },
+    { "target": "posted_at", "expr": "col('Date').str.to_datetime('%Y-%m-%d')", "dtype": "date" },
+    { "target": "description", "source": "Details" },
+    {
+      "target": "amount",
+      "expr": "col('Credit').cast('float64').fill_null(0) - col('Debit').cast('float64').fill_null(0)",
+      "dtype": "number"
+    },
+    { "target": "currency", "constant": "GBP" },
+    { "target": "account_id", "constant": "RIVER-001" },
+    { "target": "data_source", "constant": "riverbank" }
+  ]
+}

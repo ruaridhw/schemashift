@@ -18,7 +18,7 @@ from schemashift.errors import SchemaValidationError
 from schemashift.models import ColumnMapping, TransformSpec
 from schemashift.result import TransformResult
 from schemashift.transform import transform
-from schemashift.validation import ColumnConstraints, SchemaConfig
+from schemashift.validation import ColumnConstraints, DatasetSchema
 
 
 @pytest.fixture
@@ -36,8 +36,8 @@ def sample_csv(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def schema_config() -> SchemaConfig:
-    return SchemaConfig(
+def schema_config() -> DatasetSchema:
+    return DatasetSchema(
         name="test_output",
         columns={
             "id": ColumnConstraints(type="int64", nullable=False),
@@ -65,25 +65,25 @@ class TestPartialFailures:
     """Rows with bad data should appear in failures, not raise exceptions."""
 
     def test_valid_rows_returned_in_valid(
-        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: SchemaConfig
+        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: DatasetSchema
     ) -> None:
-        result = transform(sample_csv, transform_spec, schema=schema_config)
+        result = transform(sample_csv, transform_spec, dataset_schema=schema_config)
         # Only row 0 (id=1, name=Alice, amount=100, currency=USD) should be fully valid
         assert result.valid.height == 1
         assert result.valid["id"].to_list() == [1]
 
     def test_invalid_rows_in_failure_info(
-        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: SchemaConfig
+        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: DatasetSchema
     ) -> None:
-        result = transform(sample_csv, transform_spec, schema=schema_config)
+        result = transform(sample_csv, transform_spec, dataset_schema=schema_config)
         assert result.failures.has_failures
         assert result.failures.invalid is not None
         assert result.failures.invalid.height == 3
 
     def test_failure_counts_per_rule(
-        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: SchemaConfig
+        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: DatasetSchema
     ) -> None:
-        result = transform(sample_csv, transform_spec, schema=schema_config)
+        result = transform(sample_csv, transform_spec, dataset_schema=schema_config)
         counts = result.failures.counts
         # Row 1: amount=-5 violates min=0, currency=XXX violates is_in
         # Row 2: name="" violates min_length=1
@@ -93,15 +93,15 @@ class TestPartialFailures:
         assert counts["name|min_length"] >= 1
 
     def test_all_valid_is_false(
-        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: SchemaConfig
+        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: DatasetSchema
     ) -> None:
-        result = transform(sample_csv, transform_spec, schema=schema_config)
+        result = transform(sample_csv, transform_spec, dataset_schema=schema_config)
         assert result.all_valid is False
 
     def test_returns_transform_result(
-        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: SchemaConfig
+        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: DatasetSchema
     ) -> None:
-        result = transform(sample_csv, transform_spec, schema=schema_config)
+        result = transform(sample_csv, transform_spec, dataset_schema=schema_config)
         assert isinstance(result, TransformResult)
 
 
@@ -124,14 +124,14 @@ class TestCleanData:
                 ColumnMapping(target="label", source="label"),
             ],
         )
-        schema = SchemaConfig(
+        schema = DatasetSchema(
             name="s",
             columns={
                 "value": ColumnConstraints(type="int64", nullable=False),
                 "label": ColumnConstraints(type="string", nullable=False),
             },
         )
-        result = transform(csv, config, schema=schema)
+        result = transform(csv, config, dataset_schema=schema)
         assert result.all_valid
         assert result.valid.height == 3
         assert not result.failures.has_failures
@@ -141,10 +141,10 @@ class TestStrictMode:
     """strict=True should raise SchemaValidationError with FailureInfo."""
 
     def test_raises_on_failures(
-        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: SchemaConfig
+        self, sample_csv: Path, transform_spec: TransformSpec, schema_config: DatasetSchema
     ) -> None:
         with pytest.raises(SchemaValidationError) as exc_info:
-            transform(sample_csv, transform_spec, schema=schema_config, strict=True)
+            transform(sample_csv, transform_spec, dataset_schema=schema_config, strict=True)
         assert exc_info.value.failures is not None
         assert exc_info.value.failures.has_failures
 
@@ -155,11 +155,11 @@ class TestStrictMode:
             name="ok",
             columns=[ColumnMapping(target="x", source="x")],
         )
-        schema = SchemaConfig(
+        schema = DatasetSchema(
             name="s",
             columns={"x": ColumnConstraints(type="int64", nullable=False)},
         )
-        result = transform(csv, config, schema=schema, strict=True)
+        result = transform(csv, config, dataset_schema=schema, strict=True)
         assert result.all_valid
 
 
@@ -209,7 +209,7 @@ class TestDySchemaEscapeHatch:
             name="score",
             columns=[ColumnMapping(target="score", source="score")],
         )
-        result = transform(csv, config, schema=ScoreSchema)
+        result = transform(csv, config, dataset_schema=ScoreSchema)
         # score=10 and score=20 pass (>0 and >=0)
         # score=-5 fails min=0
         # score=0 fails score_nonzero rule
@@ -228,11 +228,11 @@ class TestLenientCasts:
             name="cast",
             columns=[ColumnMapping(target="val", source="val", dtype="int64")],
         )
-        schema = SchemaConfig(
+        schema = DatasetSchema(
             name="s",
             columns={"val": ColumnConstraints(type="int64", nullable=False)},
         )
-        result = transform(csv, config, schema=schema)
+        result = transform(csv, config, dataset_schema=schema)
         # Row "abc" should fail to cast and become null, then fail validation
         assert result.valid.height == 2
         assert result.failures.has_failures

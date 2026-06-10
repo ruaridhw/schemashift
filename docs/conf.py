@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath("../src"))
 project = "schemashift"
 author = "Ruaridh Williamson"
 release = "0.1.0"
-copyright = "2026, Ruaridh Williamson"
+copyright = "2026, Ruaridh Williamson"  # noqa: A001 - Sphinx expects this variable name.
 
 extensions = [
     "sphinx.ext.autodoc",

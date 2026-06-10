@@ -17,7 +17,7 @@ from click.testing import CliRunner
 from schemashift.cli import cli
 from schemashift.llm import generate_config, load_default_llm
 from schemashift.transform import transform
-from schemashift.validation import SchemaConfig
+from schemashift.validation import DatasetSchema
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -31,7 +31,7 @@ def llm():
 
 @pytest.fixture
 def lot_movement_schema():
-    return SchemaConfig.from_yaml(FIXTURES / "configs" / "lot_movement_schema.yaml")
+    return DatasetSchema.from_yaml(FIXTURES / "configs" / "lot_movement_schema.yaml")
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestGenerateConfigIntegration:
     def test_generates_valid_config(self, camstar_csv, lot_movement_schema, llm):
         config = generate_config(
             path=camstar_csv,
-            target_schema=lot_movement_schema,
+            dataset_schema=lot_movement_schema,
             llm=llm,
             n_sample_rows=5,
         )
@@ -60,7 +60,7 @@ class TestGenerateConfigIntegration:
         """The prompt arg should be included as context for the LLM."""
         config = generate_config(
             path=camstar_csv,
-            target_schema=lot_movement_schema,
+            dataset_schema=lot_movement_schema,
             llm=llm,
             n_sample_rows=5,
             user_prompt=(
